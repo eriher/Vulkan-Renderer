@@ -38,6 +38,7 @@
     <ClInclude Include="HelloTriangleApplication.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Texture.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan Tutorial.rc" />

@@ -38,7 +38,7 @@
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
-const std::array<std::string, 1> MODEL_PATH = { "models/craneo.obj" };
+const std::array<std::string, 1> MODEL_PATH = { "models/craneo.obj"};
 const std::string TEXTURE_PATH = "textures/difuso_flip_oscuro.jpg";
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -81,7 +81,7 @@ struct SwapChainSupportDetails {
 };
 
 struct UniformBufferObject {
-  alignas(16) glm::mat4 model;
+  //alignas(16) glm::mat4 model;
   alignas(16) glm::mat4 view;
   alignas(16) glm::mat4 proj;
 };
@@ -134,8 +134,8 @@ private:
   VkImageView textureImageView;
   VkSampler textureSampler;
 
-  std::vector<VkBuffer> uniformBuffers;
-  std::vector<VkDeviceMemory> uniformBuffersMemory;
+  //std::vector<VkBuffer> uniformBuffers;
+  //std::vector<VkDeviceMemory> uniformBuffersMemory;
 
   VkDescriptorPool descriptorPool;
   std::vector<VkDescriptorSet> descriptorSets;
@@ -155,9 +155,15 @@ private:
   std::vector<Model*> models;
 
 
-  glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 4.0f);
+  glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 8.0f);
   glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
   glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+  float cameraY = 0.0f;
+  float cameraZ = -1.0f;
+  float cameraX = 0.0f;
+  float cameraRadius = 4.0f;
+  float xoffset = 0;
+  float yoffset = 0;
 
   //float deltaTime = 0.0f;	// Time between current frame and last frame
   float lastFrame = 0.0f; // Time of last frame
@@ -165,7 +171,7 @@ private:
 
   int keyFlags = 0;
   int mouseFlags = 0;
-  double mouseStartX, mouseStartY;
+  double mouseStartX, mouseStartY, mouseScroll = 0.0;
 
   float yaw = -90;
   float pitch = 0;
@@ -177,6 +183,13 @@ private:
   VkRenderPass imGuiRenderPass;
   std::vector<VkFramebuffer> imGuiFramebuffers;
 
+  std::vector<UniformBufferObject> pushConstants;
+  std::vector<VkCommandBuffer> pushConstantCommandBuffers;
+
+  bool cameraView = true;
+
+  int currentModel = 0;
+
   void initWindow() {
     glfwInit();
 
@@ -187,6 +200,7 @@ private:
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
   }
 
   static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -206,6 +220,8 @@ private:
 
     createSwapChain();
     createImageViews();
+
+
     createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
@@ -217,9 +233,11 @@ private:
     createColorResources();
     createDepthResources();
     createFramebuffers();
+
     createTextureImage();
     createTextureImageView();
     createTextureSampler();
+
     loadModel();
     //createVertexBuffer();
     //createIndexBuffer();
@@ -315,6 +333,42 @@ private:
         app->keyFlags &= ~128;
     }
   }
+  
+  static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if (ImGui::GetIO().WantCaptureMouse)
+      return;
+    auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+    if (yoffset > 0)
+    {
+      if (app->cameraRadius > 2.0)
+        app->cameraRadius--;
+      else {
+        app->cameraY = 0.0f;
+        app->cameraZ = -1.0f;
+        app->cameraX = 0.0f;
+        app->yoffset = 0.0f;
+        app->cameraRadius = 0.0f;
+      }
+        
+
+      /*if (app->cameraY > 1.0)
+        app->cameraY--;
+      else if (app->cameraY < -1.0)
+        app->cameraY++;
+      else
+        app->cameraY = 0.0f;*/
+      
+    }
+    else
+    {
+      if(app->cameraRadius < 2.0f){
+        app->cameraRadius = 2.0f;
+      }
+      else
+        app->cameraRadius++;
+     // app->cameraY++;
+    }
+  }
 
   static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (ImGui::GetIO().WantCaptureMouse)
@@ -322,8 +376,21 @@ private:
 
     auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
 
-    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
-      std::cout << "RIGHT Mouse Button Pressed" << std::endl;
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+        //std::cout << "LEFT Mouse Button Pressed" << std::endl;
+        //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        //glfwGetCursorPos(window, &app->mouseStartX, &app->mouseStartY);
+        //std::cout << "start x: " << app->mouseStartX << "start y: " << app->mouseStartY << std::endl;
+        glfwGetCursorPos(window, &app->mouseStartX, &app->mouseStartY);
+        app->mouseFlags |= 2;
+
+      }
+      else if (action == GLFW_RELEASE) {
+        //std::cout << "LEFT Mouse Button Released" << std::endl;
+        //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        app->mouseFlags &= ~2;
+      }
     }
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
       if (action == GLFW_PRESS) {
@@ -331,13 +398,13 @@ private:
         //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwGetCursorPos(window, &app->mouseStartX, &app->mouseStartY);
         //std::cout << "start x: " << app->mouseStartX << "start y: " << app->mouseStartY << std::endl;
-        app->mouseFlags = app->mouseFlags | 1;
+        app->mouseFlags |=  1;
 
       }
       else if (action == GLFW_RELEASE) {
         //std::cout << "LEFT Mouse Button Released" << std::endl;
         //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        app->mouseFlags -= 1;
+        app->mouseFlags &= ~1;
       }
 
     }
@@ -453,6 +520,8 @@ private:
 
     vkFreeCommandBuffers(device.device, device.resetCommandPool, static_cast<uint32_t>(imGuiCommandBuffers.size()), imGuiCommandBuffers.data());
 
+    vkFreeCommandBuffers(device.device, device.resetCommandPool, static_cast<uint32_t>(pushConstantCommandBuffers.size()), pushConstantCommandBuffers.data());
+
     vkDestroyPipeline(device.device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device.device, pipelineLayout, nullptr);
 
@@ -465,10 +534,10 @@ private:
 
     vkDestroySwapchainKHR(device.device, swapChain, nullptr);
 
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-      vkDestroyBuffer(device.device, uniformBuffers[i], nullptr);
-      vkFreeMemory(device.device, uniformBuffersMemory[i], nullptr);
-    }
+    //for (size_t i = 0; i < swapChainImages.size(); i++) {
+    //  vkDestroyBuffer(device.device, uniformBuffers[i], nullptr);
+    //  vkFreeMemory(device.device, uniformBuffersMemory[i], nullptr);
+    //}
 
     //vkDestroyDescriptorPool(device.device, descriptorPool, nullptr);
   }
@@ -873,10 +942,18 @@ private:
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(UniformBufferObject);
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
     if (vkCreatePipelineLayout(device.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
       throw std::runtime_error("failed to create pipeline layout!");
@@ -1262,7 +1339,7 @@ private:
   }
 
   void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = device.beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = device.beginSingleTimeCommands(device.transferCommandPool);
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -1281,18 +1358,32 @@ private:
 
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    device.endSingleTimeCommands(commandBuffer);
+    device.endSingleTimeCommands(device.transferCommandPool,device.transferQueue, commandBuffer);
   }
 
   void loadModel() {
     //models.resize(MODEL_PATH.size());
     std::cout << models.size() << std::endl;
+    float xp = -3.0f;
     for (std::string mpath : MODEL_PATH) {
       std::cout << mpath << std::endl;
       auto model = new Model();
       model->device = &device;
       model->loadModel(mpath);
+      model->modelPos[3][0] = xp;
+      //model->modelPos = glm::translate(glm::mat4(1.0), glm::vec3(5.0, 0.0, 0.0));
+      //std::cout << model->modelPos[0][3] << std::endl;
+      //std::cout << model->modelPos[3][0] << std::endl;
       models.push_back(model);
+      xp += 6.0f;
+      //auto model2 = new Model();
+      //model2->device = &device;
+      //model2->loadModel(mpath);
+      //model2->modelPos[3][0] = 3.0;
+      ////model->modelPos = glm::translate(glm::mat4(1.0), glm::vec3(5.0, 0.0, 0.0));
+      ////std::cout << model->modelPos[0][3] << std::endl;
+      ////std::cout << model->modelPos[3][0] << std::endl;
+      //models.push_back(model2);
     }
     
     
@@ -1336,13 +1427,29 @@ private:
   }
 
   void createUniformBuffers() {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    //VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-    uniformBuffers.resize(swapChainImages.size());
-    uniformBuffersMemory.resize(swapChainImages.size());
+    //uniformBuffers.resize(swapChainImages.size());
+    //uniformBuffersMemory.resize(swapChainImages.size());
 
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-      device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+    //for (size_t i = 0; i < swapChainImages.size(); i++) {
+    //  device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+    //}
+
+    pushConstants.resize(swapChainImages.size());
+    for (auto i = 0; i < swapChainImages.size(); i++) {
+      pushConstants[i].proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+      pushConstants[i].proj[1][1] *= -1;
+    }
+
+    for (auto model : models) {
+      VkDeviceSize bufferSize = sizeof(glm::mat4);
+      model->descriptorBuffer.resize(swapChainImages.size());
+      model->descriptorMemory.resize(swapChainImages.size());
+      for (size_t i = 0; i < swapChainImages.size(); i++) {
+        device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, model->descriptorBuffer[i], model->descriptorMemory[i]);
+        model->updateDescriptors(i);
+      }
     }
   }
 
@@ -1396,121 +1503,186 @@ private:
   }
 
   void createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-    allocInfo.pSetLayouts = layouts.data();
+    for(auto model: models){
+      std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+      VkDescriptorSetAllocateInfo allocInfo{};
+      allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+      allocInfo.descriptorPool = descriptorPool;
+      allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+      allocInfo.pSetLayouts = layouts.data();
 
-    descriptorSets.resize(swapChainImages.size());
-    if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate descriptor sets!");
-    }
+      model->descriptorSets.resize(swapChainImages.size());
+      if (vkAllocateDescriptorSets(device.device, &allocInfo, model->descriptorSets.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+      }
 
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-      VkDescriptorBufferInfo bufferInfo{};
-      bufferInfo.buffer = uniformBuffers[i];
-      bufferInfo.offset = 0;
-      bufferInfo.range = sizeof(UniformBufferObject);
+      for (size_t i = 0; i < swapChainImages.size(); i++) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = model->descriptorBuffer[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(glm::mat4);
 
-      VkDescriptorImageInfo imageInfo{};
-      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      imageInfo.imageView = textureImageView;
-      imageInfo.sampler = textureSampler;
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = textureImageView;
+        imageInfo.sampler = textureSampler;
 
-      std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
-      descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[0].dstSet = descriptorSets[i];
-      descriptorWrites[0].dstBinding = 0;
-      descriptorWrites[0].dstArrayElement = 0;
-      descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptorWrites[0].descriptorCount = 1;
-      descriptorWrites[0].pBufferInfo = &bufferInfo;
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = model->descriptorSets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-      descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[1].dstSet = descriptorSets[i];
-      descriptorWrites[1].dstBinding = 1;
-      descriptorWrites[1].dstArrayElement = 0;
-      descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      descriptorWrites[1].descriptorCount = 1;
-      descriptorWrites[1].pImageInfo = &imageInfo;
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = model->descriptorSets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &imageInfo;
 
-      vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+      }
     }
   }
 
+  //void createDescriptorSets() {
+  //    std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+  //    VkDescriptorSetAllocateInfo allocInfo{};
+  //    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  //    allocInfo.descriptorPool = descriptorPool;
+  //    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+  //    allocInfo.pSetLayouts = layouts.data();
+
+  //    descriptorSets.resize(swapChainImages.size());
+  //    if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+  //      throw std::runtime_error("failed to allocate descriptor sets!");
+  //    }
+
+  //    for (size_t i = 0; i < swapChainImages.size(); i++) {
+  //      VkDescriptorBufferInfo bufferInfo{};
+  //      bufferInfo.buffer = uniformBuffers[i];
+  //      bufferInfo.offset = 0;
+  //      bufferInfo.range = sizeof(UniformBufferObject);
+
+  //      VkDescriptorImageInfo imageInfo{};
+  //      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  //      imageInfo.imageView = textureImageView;
+  //      imageInfo.sampler = textureSampler;
+
+  //      std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+  //      descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  //      descriptorWrites[0].dstSet = descriptorSets[i];
+  //      descriptorWrites[0].dstBinding = 0;
+  //      descriptorWrites[0].dstArrayElement = 0;
+  //      descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  //      descriptorWrites[0].descriptorCount = 1;
+  //      descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+  //      descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  //      descriptorWrites[1].dstSet = descriptorSets[i];
+  //      descriptorWrites[1].dstBinding = 1;
+  //      descriptorWrites[1].dstArrayElement = 0;
+  //      descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  //      descriptorWrites[1].descriptorCount = 1;
+  //      descriptorWrites[1].pImageInfo = &imageInfo;
+
+  //      vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+  //    }
+  //}
+
 
   void createCommandBuffers() {
+    {
+      pushConstantCommandBuffers.resize(swapChainFramebuffers.size());
+      VkCommandBufferAllocateInfo allocInfo{};
+      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      allocInfo.commandPool = device.resetCommandPool;
+      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      allocInfo.commandBufferCount = (uint32_t)pushConstantCommandBuffers.size();
 
-    imGuiCommandBuffers.resize(swapChainFramebuffers.size());
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = device.resetCommandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t)imGuiCommandBuffers.size();
-
-    if (vkAllocateCommandBuffers(device.device, &allocInfo, imGuiCommandBuffers.data()) != VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate command buffers!");
+      if (vkAllocateCommandBuffers(device.device, &allocInfo, pushConstantCommandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
+      }
     }
 
+    {
+      imGuiCommandBuffers.resize(swapChainFramebuffers.size());
+      VkCommandBufferAllocateInfo allocInfo{};
+      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      allocInfo.commandPool = device.resetCommandPool;
+      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      allocInfo.commandBufferCount = (uint32_t)imGuiCommandBuffers.size();
 
-    commandBuffers.resize(swapChainFramebuffers.size());
-
-    //VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = device.graphicsCommandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
-
-    if (vkAllocateCommandBuffers(device.device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate command buffers!");
+      if (vkAllocateCommandBuffers(device.device, &allocInfo, imGuiCommandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
+      }
     }
 
-    for (size_t i = 0; i < commandBuffers.size(); i++) {
-      VkCommandBufferBeginInfo beginInfo{};
-      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    {
+      commandBuffers.resize(swapChainFramebuffers.size());
 
-      if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
+      VkCommandBufferAllocateInfo allocInfo{};
+      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      allocInfo.commandPool = device.graphicsCommandPool;
+      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+      if (vkAllocateCommandBuffers(device.device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
       }
 
-      VkRenderPassBeginInfo renderPassInfo{};
-      renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-      renderPassInfo.renderPass = renderPass;
-      renderPassInfo.framebuffer = swapChainFramebuffers[i];
-      renderPassInfo.renderArea.offset = { 0, 0 };
-      renderPassInfo.renderArea.extent = swapChainExtent;
+      for (size_t i = 0; i < commandBuffers.size(); i++) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-      std::array<VkClearValue, 2> clearValues{};
-      clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-      clearValues[1].depthStencil = { 1.0f, 0 };
+        if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
+          throw std::runtime_error("failed to begin recording command buffer!");
+        }
 
-      renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-      renderPassInfo.pClearValues = clearValues.data();
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.framebuffer = swapChainFramebuffers[i];
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = swapChainExtent;
 
-      vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
 
-      vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
-      for(auto model: models){
+        vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkBuffer vertexBuffers[] = { model->vertexBuffer };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        for(auto model: models){
 
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+          VkBuffer vertexBuffers[] = { model->vertexBuffer };
+          VkDeviceSize offsets[] = { 0 };
+          vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-        vkCmdDrawIndexed(commandBuffers[i], model->indices, 1, 0, 0, 0);
+          vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-      }
-      vkCmdEndRenderPass(commandBuffers[i]);
+          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
 
-      if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &model->descriptorSets[i], 0, nullptr);
+
+          vkCmdDrawIndexed(commandBuffers[i], model->indices, 1, 0, 0, 0);
+
+        }
+        vkCmdEndRenderPass(commandBuffers[i]);
+
+        if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+          throw std::runtime_error("failed to record command buffer!");
+        }
       }
     }
   }
@@ -1555,99 +1727,225 @@ private:
   //  vkUnmapMemory(device.device, uniformBuffersMemory[currentImage]);
   //}
 
-  void updateUniformBuffer(uint32_t currentImage) {
+  //void updateUniformBuffer(uint32_t currentImage) {
 
-    float speed = 5.0f * deltaFrame;
+  //  //glm::mat4 model = glm::mat4(1.0f);
+  //  float speed = 5.0f * deltaFrame;
 
-    if (keyFlags & 1 && !(keyFlags & 2))
-      cameraPos += cameraFront * speed;
-    if (keyFlags & 2 && !(keyFlags & 1))
-      cameraPos -= cameraFront * speed;
-    if (keyFlags & 4 && !(keyFlags & 8))
-      cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
-    if (keyFlags & 8 && !(keyFlags & 4))
-      cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+  //  if (keyFlags & 16 && !(keyFlags & 32))
+  //    modelPos = glm::translate(modelPos, glm::vec3(0.0f, 0.0f, 2.0f * speed));
+  //  if (keyFlags & 32 && !(keyFlags & 16))
+  //    modelPos = glm::translate(modelPos, glm::vec3(0.0f, 0.0f, 2.0f * -speed));
 
 
-    //glm::mat4 model = glm::mat4(1.0f);
-
-    if (keyFlags & 16 && !(keyFlags & 32))
-      modelPos = glm::translate(modelPos, glm::vec3(0.0f, 0.0f, 2.0f * speed));
-    if (keyFlags & 32 && !(keyFlags & 16))
-      modelPos = glm::translate(modelPos, glm::vec3(0.0f, 0.0f, 2.0f * -speed));
-
-
-    if (keyFlags & 64 && !(keyFlags & 128))
-      modelPos = glm::rotate(modelPos, glm::radians(90.0f * deltaFrame), glm::vec3(0, 1, 0));
-    if (keyFlags & 128 && !(keyFlags & 64))
-      modelPos = glm::rotate(modelPos, glm::radians(90.0f * deltaFrame), glm::vec3(0, -1, 0));
-
-    if (mouseFlags & 1) {
-
-      //mouse button is pressed
-      double currentX, currentY;
-      glfwGetCursorPos(window, &currentX, &currentY);
-
-      float xoffset = currentX - mouseStartX;
-      float yoffset = mouseStartY - currentY;
-      mouseStartX = currentX;
-      mouseStartY = currentY;
+  //  if (keyFlags & 64 && !(keyFlags & 128))
+  //    modelPos = glm::rotate(modelPos, glm::radians(90.0f * deltaFrame), glm::vec3(0, 1, 0));
+  //  if (keyFlags & 128 && !(keyFlags & 64))
+  //    modelPos = glm::rotate(modelPos, glm::radians(90.0f * deltaFrame), glm::vec3(0, -1, 0));
 
 
 
-      const float sensitivity = 0.1f;
-      xoffset *= sensitivity;
-      yoffset *= sensitivity;
+  //  if (keyFlags & 1 && !(keyFlags & 2))
+  //    cameraPos += cameraFront * speed;
+  //  if (keyFlags & 2 && !(keyFlags & 1))
+  //    cameraPos -= cameraFront * speed;
+  //  if (keyFlags & 4 && !(keyFlags & 8))
+  //    cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+  //  if (keyFlags & 8 && !(keyFlags & 4))
+  //    cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
 
-      yaw += xoffset;
-      pitch += yoffset;
+  //  if (mouseFlags & 1) {
 
-      if (pitch > 89.0f)
-        pitch = 89.0f;
-      if (pitch < -89.0f)
-        pitch = -89.0f;
+  //    //mouse button is pressed
+  //    double currentX, currentY;
+  //    glfwGetCursorPos(window, &currentX, &currentY);
+
+  //    float xoffset = currentX - mouseStartX;
+  //    float yoffset = mouseStartY - currentY;
+  //    mouseStartX = currentX;
+  //    mouseStartY = currentY;
 
 
-      //std::cout << "yaw: " << yaw << std::endl;
-      //std::cout << "cam x: " << cameraFront.x << std::endl;
-      //std::cout << "cam y: " << cameraFront.y << std::endl;
-      //std::cout << "cam z: " << cameraFront.z << std::endl;
 
-      //glm::vec3 direction;
-      //direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-      //direction.y = sin(glm::radians(pitch));
-      //direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-      //yaw = 0;
-      cameraFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-      cameraFront.y = sin(glm::radians(pitch));
-      cameraFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-      cameraFront = glm::normalize(cameraFront);
+  //    const float sensitivity = 0.1f;
+  //    xoffset *= sensitivity;
+  //    yoffset *= sensitivity;
+
+  //    yaw += xoffset;
+  //    pitch += yoffset;
+
+  //    if (pitch > 89.0f)
+  //      pitch = 89.0f;
+  //    if (pitch < -89.0f)
+  //      pitch = -89.0f;
+
+
+  //    //std::cout << "yaw: " << yaw << std::endl;
+  //    //std::cout << "cam x: " << cameraFront.x << std::endl;
+  //    //std::cout << "cam y: " << cameraFront.y << std::endl;
+  //    //std::cout << "cam z: " << cameraFront.z << std::endl;
+
+  //    //glm::vec3 direction;
+  //    //direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  //    //direction.y = sin(glm::radians(pitch));
+  //    //direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+  //    //yaw = 0;
+  //    cameraFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  //    cameraFront.y = sin(glm::radians(pitch));
+  //    cameraFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+  //    cameraFront = glm::normalize(cameraFront);
+
+  //  }
+
+
+  //  UniformBufferObject ubo{};
+  //  //ubo.model = modelPos;
+  //  //ubo.model = glm::translate(glm::mat4(1.0f), modelPos);
+  //  ubo.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+  //  ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+  //  ubo.proj[1][1] *= -1;
+
+  //  //std::cout << "---------------" << std::endl;
+  //  //std::cout << ubo.model[0][0] << ubo.model[0][1] << ubo.model[0][2] << ubo.model[0][3] << std::endl;
+  //  //std::cout << ubo.model[1][0] << ubo.model[1][1] << ubo.model[1][2] << ubo.model[1][3] << std::endl;
+  //  //std::cout << ubo.model[2][0] << ubo.model[2][1] << ubo.model[2][2] << ubo.model[2][3] << std::endl;
+  //  //std::cout << ubo.model[3][0] << ubo.model[3][1] << ubo.model[3][2] << ubo.model[3][3] << std::endl;
+  //  //std::cout << "---------------" << std::endl;
+
+  //  //std::cout << sizeof(ubo) << std::endl;
+
+  //  void* data;
+  //  vkMapMemory(device.device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+  //  memcpy(data, &ubo, sizeof(ubo));
+  //  vkUnmapMemory(device.device, uniformBuffersMemory[currentImage]);
+
+  //}
+
+  void updatePushConstant(uint32_t imageIndex) {
+    if(cameraView){
+      float speed = 5.0f * deltaFrame;
+
+      if (((mouseFlags & 1 && mouseFlags & 2) || keyFlags & 1) && !(keyFlags & 2))
+        cameraPos += cameraFront * speed;
+      if (keyFlags & 2 && !(keyFlags & 1))
+        cameraPos -= cameraFront * speed;
+      if (keyFlags & 4 && !(keyFlags & 8))
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+      if (keyFlags & 8 && !(keyFlags & 4))
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+
+      if (mouseFlags & 1) {
+
+        //mouse button is pressed
+        double currentX, currentY;
+        glfwGetCursorPos(window, &currentX, &currentY);
+
+        float xoffset = currentX - mouseStartX;
+        float yoffset = mouseStartY - currentY;
+        mouseStartX = currentX;
+        mouseStartY = currentY;
+
+
+
+        const float sensitivity = 0.1f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw += xoffset;
+        pitch += yoffset;
+
+        if (pitch > 89.0f)
+          pitch = 89.0f;
+        if (pitch < -89.0f)
+          pitch = -89.0f;
+
+
+        //std::cout << "yaw: " << yaw << std::endl;
+        //std::cout << "cam x: " << cameraFront.x << std::endl;
+        //std::cout << "cam y: " << cameraFront.y << std::endl;
+        //std::cout << "cam z: " << cameraFront.z << std::endl;
+
+        //glm::vec3 direction;
+        //direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        //direction.y = sin(glm::radians(pitch));
+        //direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        //yaw = 0;
+        cameraFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraFront.y = sin(glm::radians(pitch));
+        cameraFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraFront = glm::normalize(cameraFront);
+
+      }
+
+      pushConstants[imageIndex].view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+    }
+    else {
+      //glm::vec3 pos{models[currentModel]->modelPos[3][0], models[currentModel]->modelPos[3][1]+3.0f,models[currentModel]->modelPos[3][2] - 3.0f };
+      //glm::mat4 test{ models[currentModel]->modelPos };
+      //test[3][0] = 0;
+      //test[3][1] = 0;
+      //test[3][2] = 0;
+      //glm::vec4 front{ models[currentModel]->modelPos[3][0], models[currentModel]->modelPos[3][1],models[currentModel]->modelPos[3][2]+1.0, 1.0 };
+      //front = test * front;
+      if (mouseFlags) {
+        double currentX, currentY;
+        glfwGetCursorPos(window, &currentX, &currentY);
+
+        const float sensitivity = 0.1f;
+
+        float local_xOffset = (currentX - mouseStartX) * sensitivity;
+        float local_yOffset = (mouseStartY - currentY) * sensitivity;
+        mouseStartX = currentX;
+        mouseStartY = currentY;
+        //std::cout << "x: " << local_xOffset << glm::radians(local_xOffset) << std::endl;
+        //std::cout << "y: " << local_yOffset << glm::radians(local_yOffset) << std::endl;
+        xoffset += local_xOffset;
+        yoffset += local_yOffset;
+
+
+
+
+        if (yoffset > 85.0f)
+          yoffset = 85.0f;
+        else if (yoffset < -85.0f)
+          yoffset = -85.0f;
+
+
+        float newX = std::sin(glm::radians(xoffset)) * std::cos(glm::radians(yoffset));
+        float newY = -std::sin(glm::radians(yoffset));
+        float newZ = -std::cos(glm::radians(yoffset));
+        if (mouseFlags & 2) {
+          models[currentModel]->modelPos = glm::rotate(models[currentModel]->modelPos, glm::radians(xoffset), glm::vec3(0.0f, -1.0f, 0.0f));
+          if (mouseFlags & 1)
+            models[currentModel]->modelPos = glm::translate(models[currentModel]->modelPos, glm::vec3(0.0f, 0.0f, 2.0f * 5.0f * deltaFrame));
+          cameraX = 0.0f;
+          xoffset = local_xOffset;
+
+        }
+        else if (cameraRadius > 1.0f) {
+          newZ *= std::cos(glm::radians(xoffset));
+          cameraX = newX;
+        }
+        else{
+          xoffset = 0.0f;
+          yoffset = 0.0f;
+        }
+        if (cameraRadius > 1.0f) {
+          cameraY = newY;
+          cameraZ = newZ;
+        }
+
+      }
+
+
+      glm::vec4 pos(cameraRadius*cameraX, cameraRadius*cameraY, cameraRadius*cameraZ, 1.0f);
+
+      pos = models[currentModel]->modelPos * pos;
+      glm::vec4 front(0.0f,0.0f,0.1f,1.0f);
+      front = models[currentModel]->modelPos * front;
+      pushConstants[imageIndex].view = glm::lookAt(glm::vec3(pos), glm::vec3(front), cameraUp);
 
     }
-
-
-    UniformBufferObject ubo{};
-    ubo.model = modelPos;
-    //ubo.model = glm::translate(glm::mat4(1.0f), modelPos);
-    ubo.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    ubo.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-    ubo.proj[1][1] *= -1;
-
-    //std::cout << "---------------" << std::endl;
-    //std::cout << ubo.model[0][0] << ubo.model[0][1] << ubo.model[0][2] << ubo.model[0][3] << std::endl;
-    //std::cout << ubo.model[1][0] << ubo.model[1][1] << ubo.model[1][2] << ubo.model[1][3] << std::endl;
-    //std::cout << ubo.model[2][0] << ubo.model[2][1] << ubo.model[2][2] << ubo.model[2][3] << std::endl;
-    //std::cout << ubo.model[3][0] << ubo.model[3][1] << ubo.model[3][2] << ubo.model[3][3] << std::endl;
-    //std::cout << "---------------" << std::endl;
-
-    //std::cout << sizeof(ubo) << std::endl;
-
-    void* data;
-    vkMapMemory(device.device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(device.device, uniformBuffersMemory[currentImage]);
-
   }
 
   void drawFrame() {
@@ -1664,15 +1962,40 @@ private:
       throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    updateUniformBuffer(imageIndex);
+    //updateUniformBuffer(imageIndex);
+    
+    
+
+    
+    models[currentModel]->updateModelpos(keyFlags, deltaFrame);
+    models[currentModel]->updateDescriptors(imageIndex);
+    updatePushConstant(imageIndex);
+    
 
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
       vkWaitForFences(device.device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
+
+    {
+      VkCommandBufferBeginInfo info = {};
+      info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      if (vkBeginCommandBuffer(pushConstantCommandBuffers[imageIndex], &info) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create imgui command buffer!");
+      }
+    }
+
+    //VkCommandBuffer pcBuffer = device.beginSingleTimeCommands();
+    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstants[imageIndex]);
+    //device.endSingleTimeCommands(pcBuffer);
+
+    if (vkEndCommandBuffer(pushConstantCommandBuffers[imageIndex]) != VK_SUCCESS) {
+      throw std::runtime_error("failed to end imgui command buffer!");
+    }
+
     //IMGUI stuff
-    
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -1702,7 +2025,43 @@ private:
 
       if (ImGui::Button("apply"))
         framebufferResized = true;
+
+      //const char* items[] = { "AAAA", "BBBB", "CCCC", "DDDD", "EEEE", "FFFF", "GGGG", "HHHH", "IIII", "JJJJ", "KKKK", "LLLLLLL", "MMMM", "OOOOOOO", "PPPP", "QQQQQQQQQQ", "RRR", "SSSS" };
+      //static const char* current_item = NULL;
+      const char* items[] = { "model_1", "model_2" };
+      if (ImGui::BeginCombo("##combo", items[currentModel])) // The second parameter is the label previewed before opening the combo.
+      {
+        for (int n = 0; n < 2; n++)
+        {
+          bool is_selected = (n == currentModel); // You can store your selection however you want, outside or inside your objects
+          if (ImGui::Selectable(items[n], is_selected))
+            currentModel = n;
+          if (is_selected)
+            ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::Text("Camera Control");
+
+      if (cameraView && ImGui::Button("Switch to Model view")){
+        cameraView = false;
+      }
+      else if (!cameraView && ImGui::Button("Switch to Camera view")){
+        cameraView = true;
+      }
+      if (!cameraView) {
+        ImGui::SliderFloat("X-axis:", &cameraX, -10.0f, 10.0f);
+        ImGui::SliderFloat("Y-axis:", &cameraY, -10.0f, 10.0f);
+        ImGui::SliderFloat("Z-axis:", &cameraZ, -10.0f, 10.0f);
+        ImGui::SliderFloat("Camera radius:", &cameraRadius, 0.0f, 20.0f);
+        float r = std::sqrt(std::pow(cameraX, 2) + std::pow(cameraY, 2) + std::pow(cameraZ, 2));
+        ImGui::Text("real radius: %.3f",r);
+      }
+
+
       ImGui::End();
+
+
     }
     ImGui::Render();
 
@@ -1742,8 +2101,8 @@ private:
     //std::array<VkCommandBuffer, 3> submitCommandBuffers =
     //{ commandBuffers[imageIndex], pushConstantCommandBuffers[imageIndex], imGuiCommandBuffers[imageIndex] };
 
-    std::array<VkCommandBuffer, 2> submitCommandBuffers =
-    { commandBuffers[imageIndex], imGuiCommandBuffers[imageIndex] };
+    std::array<VkCommandBuffer, 3> submitCommandBuffers =
+    { pushConstantCommandBuffers[imageIndex], commandBuffers[imageIndex], imGuiCommandBuffers[imageIndex] };
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
