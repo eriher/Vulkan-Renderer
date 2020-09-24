@@ -113,7 +113,8 @@ private:
   std::vector<VkFramebuffer> swapChainFramebuffers;
 
   VkRenderPass renderPass;
-  VkDescriptorSetLayout descriptorSetLayout;
+
+
   VkPipelineLayout pipelineLayout;
   VkPipeline graphicsPipeline;
 
@@ -130,7 +131,6 @@ private:
   //std::vector<VkDeviceMemory> uniformBuffersMemory;
 
   VkDescriptorPool descriptorPool;
-  std::vector<VkDescriptorSet> descriptorSets;
 
   std::vector<VkCommandBuffer> commandBuffers;
 
@@ -168,9 +168,6 @@ private:
   float yaw = -90;
   float pitch = 0;
 
-  //glm::vec3 modelPos = glm::vec3();
-  glm::mat4 modelPos = glm::mat4(1.0f);
-
   std::vector<VkCommandBuffer> imGuiCommandBuffers;
   VkRenderPass imGuiRenderPass;
   std::vector<VkFramebuffer> imGuiFramebuffers;
@@ -205,41 +202,31 @@ private:
     setupDebugMessenger();
     createSurface();
 
-    //pickPhysicalDevice();
-    //createLogicalDevice();
-
     createDevice();
 
     createSwapChain();
     createImageViews();
 
-
     createRenderPass();
-    createDescriptorSetLayout();
+
+    createDescriptorPool();
+
+    loadModels();
+
+    createUniformBuffers();
+
     createGraphicsPipeline();
 
-    //createCommandPool();
-    createDescriptorPool();
     setupImGUI();
 
     createColorResources();
     createDepthResources();
     createFramebuffers();
 
-    //createTextureImage();
-    //createTextureImageView();
-    //createTextureSampler();
-
-    loadModel();
-    //createVertexBuffer();
-    //createIndexBuffer();
-    createUniformBuffers();
     
-    createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
 
-    
   }
 
   void createDevice() {
@@ -255,12 +242,9 @@ private:
 
     for (auto& d : devices) {
       if (isDeviceSuitable(d)) {
-        //device = Device(device, indices);
-        //device = Device(d, indices, enableValidationLayers);
+
         device.initDevice(d, qfi, enableValidationLayers);
-        //queueFamilies = indices;
-        //physicalDevice = device;
-        //msaaSamples = getMaxUsableSampleCount();
+
         break;
       }
     }
@@ -542,13 +526,6 @@ private:
 
     vkDestroyDescriptorPool(device.device, descriptorPool, nullptr);
 
-    vkDestroyDescriptorSetLayout(device.device, descriptorSetLayout, nullptr);
-
-    //vkDestroyBuffer(device, indexBuffer, nullptr);
-    //vkFreeMemory(device, indexBufferMemory, nullptr);
-
-    //vkDestroyBuffer(device, vertexBuffer, nullptr);
-    //vkFreeMemory(device, vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       vkDestroySemaphore(device.device, renderFinishedSemaphores[i], nullptr);
@@ -605,7 +582,6 @@ private:
     createDepthResources();
     createFramebuffers();
     createUniformBuffers();
-    createDescriptorSets();
     createCommandBuffers();
   }
 
@@ -808,32 +784,6 @@ private:
     }
   }
 
-  void createDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create descriptor set layout!");
-    }
-  }
-
   void createGraphicsPipeline() {
     auto vertShaderCode = readFile("shaders/vert.spv");
     auto fragShaderCode = readFile("shaders/frag.spv");
@@ -936,7 +886,8 @@ private:
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    // FIX THE LINE BELOW WHEN REFACTOR
+    pipelineLayoutInfo.pSetLayouts = &models[0]->descriptorSetLayout;
 
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -1184,137 +1135,52 @@ private:
     device.endSingleTimeCommands(device.transferCommandPool,device.transferQueue, commandBuffer);
   }
 
-  void loadModel() {
-    //models.resize(MODEL_PATH.size());
+  void loadModels() {
     std::cout << models.size() << std::endl;
-    //float xp = -3.0f;
     for (auto& pair : MODEL_PATH) {
       std::cout << pair.first << std::endl;
       auto model = new Model();
       model->device = &device;
+      model->swapChainSize = swapChainImages.size();
+      model->descriptorPool = descriptorPool;
       model->loadModel(pair.first, pair.second);
-      //model->modelPos[3][0] = xp;
-      //model->modelPos = glm::translate(glm::mat4(1.0), glm::vec3(5.0, 0.0, 0.0));
-      //std::cout << model->modelPos[0][3] << std::endl;
-      //std::cout << model->modelPos[3][0] << std::endl;
+      model->createDescriptorSetLayout();
+      model->createDescriptorBuffers();
+      model->createDescriptorSets();
       models.push_back(model);
-      //xp += 6.0f;
-      //auto model2 = new Model();
-      //model2->device = &device;
-      //model2->loadModel(mpath);
-      //model2->modelPos[3][0] = 3.0;
-      ////model->modelPos = glm::translate(glm::mat4(1.0), glm::vec3(5.0, 0.0, 0.0));
-      ////std::cout << model->modelPos[0][3] << std::endl;
-      ////std::cout << model->modelPos[3][0] << std::endl;
-      //models.push_back(model2);
     }
-    
-    
-
-    //tinyobj::attrib_t attrib;
-    //std::vector<tinyobj::shape_t> shapes;
-    //std::vector<tinyobj::material_t> materials;
-    //std::string warn, err;
-
-    //if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-    //  throw std::runtime_error(warn + err);
-    //}
-
-    //std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
-    //for (const auto& shape : shapes) {
-    //  for (const auto& index : shape.mesh.indices) {
-    //    Vertex vertex{};
-
-    //    vertex.pos = {
-    //        attrib.vertices[3 * index.vertex_index + 0],
-    //        attrib.vertices[3 * index.vertex_index + 1],
-    //        attrib.vertices[3 * index.vertex_index + 2]
-    //    };
-
-    //    vertex.texCoord = {
-    //        attrib.texcoords[2 * index.texcoord_index + 0],
-    //        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-    //    };
-
-    //    vertex.color = { 1.0f, 1.0f, 1.0f };
-
-    //    if (uniqueVertices.count(vertex) == 0) {
-    //      uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-    //      vertices.push_back(vertex);
-    //    }
-
-    //    indices.push_back(uniqueVertices[vertex]);
-    //  }
-    //}
   }
 
   void createUniformBuffers() {
-    //VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
-    //uniformBuffers.resize(swapChainImages.size());
-    //uniformBuffersMemory.resize(swapChainImages.size());
-
-    //for (size_t i = 0; i < swapChainImages.size(); i++) {
-    //  device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-    //}
 
     pushConstants.resize(swapChainImages.size());
     for (auto i = 0; i < swapChainImages.size(); i++) {
       pushConstants[i].proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
       pushConstants[i].proj[1][1] *= -1;
     }
-
-    for (auto model : models) {
-      VkDeviceSize bufferSize = sizeof(glm::mat4);
-      model->descriptorBuffer.resize(swapChainImages.size());
-      model->descriptorMemory.resize(swapChainImages.size());
-      for (size_t i = 0; i < swapChainImages.size(); i++) {
-        device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, model->descriptorBuffer[i], model->descriptorMemory[i]);
-        model->updateDescriptors(i);
-      }
-    }
   }
-
-  //void createDescriptorPool() {
-  //  std::array<VkDescriptorPoolSize, 2> poolSizes{};
-  //  poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  //  poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-  //  poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  //  poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-
-  //  VkDescriptorPoolCreateInfo poolInfo{};
-  //  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  //  poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-  //  poolInfo.pPoolSizes = poolSizes.data();
-  //  poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
-
-  //  if (vkCreateDescriptorPool(device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-  //    throw std::runtime_error("failed to create descriptor pool!");
-  //  }
-  //}
 
   void createDescriptorPool() {
 
     VkDescriptorPoolSize pool_sizes[11] =
     {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 10 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 10 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 10 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 10 }
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 }
     };
 
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 2 * 11;
+    pool_info.maxSets = 100 * 11;
     pool_info.poolSizeCount = 11;
     pool_info.pPoolSizes = pool_sizes;
 
@@ -1324,101 +1190,6 @@ private:
     }
 
   }
-
-  void createDescriptorSets() {
-    for(auto model: models){
-      std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-      VkDescriptorSetAllocateInfo allocInfo{};
-      allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-      allocInfo.descriptorPool = descriptorPool;
-      allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-      allocInfo.pSetLayouts = layouts.data();
-
-      model->descriptorSets.resize(swapChainImages.size());
-      if (vkAllocateDescriptorSets(device.device, &allocInfo, model->descriptorSets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-      }
-
-      for (size_t i = 0; i < swapChainImages.size(); i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = model->descriptorBuffer[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(glm::mat4);
-
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = model->textures[0].view;
-        imageInfo.sampler = model->textures[0].sampler;
-
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = model->descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = model->descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-
-        vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-      }
-    }
-  }
-
-  //void createDescriptorSets() {
-  //    std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-  //    VkDescriptorSetAllocateInfo allocInfo{};
-  //    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  //    allocInfo.descriptorPool = descriptorPool;
-  //    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-  //    allocInfo.pSetLayouts = layouts.data();
-
-  //    descriptorSets.resize(swapChainImages.size());
-  //    if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-  //      throw std::runtime_error("failed to allocate descriptor sets!");
-  //    }
-
-  //    for (size_t i = 0; i < swapChainImages.size(); i++) {
-  //      VkDescriptorBufferInfo bufferInfo{};
-  //      bufferInfo.buffer = uniformBuffers[i];
-  //      bufferInfo.offset = 0;
-  //      bufferInfo.range = sizeof(UniformBufferObject);
-
-  //      VkDescriptorImageInfo imageInfo{};
-  //      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  //      imageInfo.imageView = textureImageView;
-  //      imageInfo.sampler = textureSampler;
-
-  //      std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-  //      descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  //      descriptorWrites[0].dstSet = descriptorSets[i];
-  //      descriptorWrites[0].dstBinding = 0;
-  //      descriptorWrites[0].dstArrayElement = 0;
-  //      descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  //      descriptorWrites[0].descriptorCount = 1;
-  //      descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-  //      descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  //      descriptorWrites[1].dstSet = descriptorSets[i];
-  //      descriptorWrites[1].dstBinding = 1;
-  //      descriptorWrites[1].dstArrayElement = 0;
-  //      descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  //      descriptorWrites[1].descriptorCount = 1;
-  //      descriptorWrites[1].pImageInfo = &imageInfo;
-
-  //      vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-  //    }
-  //}
-
 
   void createCommandBuffers() {
     {

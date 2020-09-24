@@ -2,6 +2,7 @@
 
 
 void Model::cleanup() {
+
 	for (auto texture : textures) {
 		vkDestroySampler(device->device, texture.sampler, nullptr);
 		vkDestroyImageView(device->device, texture.view, nullptr);
@@ -16,11 +17,12 @@ void Model::cleanup() {
 	vkDestroyBuffer(device->device, vertexBuffer, nullptr);
 	vkFreeMemory(device->device, vertexBufferMemory, nullptr);
 
-	for(auto i = 0; i < descriptorBuffer.size(); i++){
+	for (auto i = 0; i < descriptorBuffer.size(); i++) {
 		vkDestroyBuffer(device->device, descriptorBuffer[i], nullptr);
 		vkFreeMemory(device->device, descriptorMemory[i], nullptr);
 	}
-}
+	vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
+};
 
 void Model::loadModel(std::string modelPath, std::string texturePath) {
 	Texture texture;
@@ -80,6 +82,8 @@ void Model::loadModel(std::string modelPath) {
 
 	device->createStagedBuffer(modelVertices, vertexBuffer, vertexBufferMemory, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	device->createStagedBuffer(modelIndices, indexBuffer, indexBufferMemory, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+
 }
 
 void Model::updateDescriptors(uint32_t idx) {
@@ -103,4 +107,86 @@ void Model::updateModelpos(int keyFlags, float delta) {
 	if (keyFlags & 128 && !(keyFlags & 64))
 		modelPos = glm::rotate(modelPos, glm::radians(90.0f * delta), glm::vec3(0, -1, 0));
 
+}
+
+void Model::createDescriptorSets() {
+	std::vector<VkDescriptorSetLayout> layouts(swapChainSize, descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize);
+	allocInfo.pSetLayouts = layouts.data();
+
+	descriptorSets.resize(swapChainSize);
+	if (vkAllocateDescriptorSets(device->device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor sets!");
+	}
+
+	for (size_t i = 0; i < swapChainSize; i++) {
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = descriptorBuffer[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(glm::mat4);
+
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = textures[0].view;
+		imageInfo.sampler = textures[0].sampler;
+
+		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = descriptorSets[i];
+		descriptorWrites[0].dstBinding = 0;
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[1].dstSet = descriptorSets[i];
+		descriptorWrites[1].dstBinding = 1;
+		descriptorWrites[1].dstArrayElement = 0;
+		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[1].descriptorCount = 1;
+		descriptorWrites[1].pImageInfo = &imageInfo;
+
+		vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+	}
+}
+
+void Model::createDescriptorSetLayout() {
+		VkDescriptorSetLayoutBinding uboLayoutBinding{};
+		uboLayoutBinding.binding = 0;
+		uboLayoutBinding.descriptorCount = 1;
+		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboLayoutBinding.pImmutableSamplers = nullptr;
+		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+		samplerLayoutBinding.binding = 1;
+		samplerLayoutBinding.descriptorCount = 1;
+		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerLayoutBinding.pImmutableSamplers = nullptr;
+		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		layoutInfo.pBindings = bindings.data();
+
+		if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create descriptor set layout!");
+		}
+	}
+
+void Model::createDescriptorBuffers() {
+	VkDeviceSize bufferSize = sizeof(glm::mat4);
+	descriptorBuffer.resize(swapChainSize);
+	descriptorMemory.resize(swapChainSize);
+	for (size_t i = 0; i < swapChainSize; i++) {
+		device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, descriptorBuffer[i], descriptorMemory[i]);
+		updateDescriptors(i);
+	}
 }

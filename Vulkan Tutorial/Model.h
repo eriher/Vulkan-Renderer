@@ -45,6 +45,7 @@ class Model {
 
 public:
 	Device* device;
+
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 
@@ -54,6 +55,10 @@ public:
 	std::vector<Texture> textures;
 	std::vector<Material> materials;
 
+	uint32_t swapChainSize;
+
+	VkDescriptorPool descriptorPool;
+	VkDescriptorSetLayout descriptorSetLayout;
 	std::vector<VkDescriptorSet> descriptorSets;
 
 	std::vector<VkBuffer> descriptorBuffer;
@@ -70,7 +75,8 @@ public:
 	void loadModel(std::string modelPath, std::string texturePath);
 	void updateDescriptors(uint32_t idx);
 	void updateModelpos(int keyFlags, float delta);
+	void createDescriptorSetLayout();
+	void createDescriptorSets();
+	void createDescriptorBuffers();
 	void cleanup();
-
-
 };
