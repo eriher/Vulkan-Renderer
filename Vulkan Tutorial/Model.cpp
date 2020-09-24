@@ -2,6 +2,14 @@
 
 
 void Model::cleanup() {
+	for (auto texture : textures) {
+		vkDestroySampler(device->device, texture.sampler, nullptr);
+		vkDestroyImageView(device->device, texture.view, nullptr);
+
+		vkDestroyImage(device->device, texture.image, nullptr);
+		vkFreeMemory(device->device, texture.deviceMemory, nullptr);
+	}
+
 	vkDestroyBuffer(device->device, indexBuffer, nullptr);
 	vkFreeMemory(device->device, indexBufferMemory, nullptr);
 
@@ -12,6 +20,14 @@ void Model::cleanup() {
 		vkDestroyBuffer(device->device, descriptorBuffer[i], nullptr);
 		vkFreeMemory(device->device, descriptorMemory[i], nullptr);
 	}
+}
+
+void Model::loadModel(std::string modelPath, std::string texturePath) {
+	Texture texture;
+	texture.device = device;
+	texture.load(texturePath);
+	textures.push_back(texture);
+	loadModel(modelPath);
 }
 
 void Model::loadModel(std::string modelPath) {

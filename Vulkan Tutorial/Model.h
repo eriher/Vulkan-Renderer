@@ -10,16 +10,20 @@
 #include <unordered_map>
 #include <string>
 
-struct Material
-{
-	std::string m_name;
-	glm::vec3	m_color;
+struct MaterialProperties {
+	glm::vec3	color;
 	float		m_reflectivity;
 	float		m_shininess;
 	float		m_metalness;
 	float		m_fresnel;
 	float		m_emission;
 	float		m_transparency;
+};
+
+struct Material
+{
+	std::string m_name;
+	MaterialProperties properties;
 	Texture m_color_texture;
 	Texture	m_reflectivity_texture;
 	Texture	m_shininess_texture;
@@ -39,8 +43,6 @@ struct Mesh
 
 class Model {
 
-	
-
 public:
 	Device* device;
 	VkBuffer vertexBuffer;
@@ -48,6 +50,9 @@ public:
 
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
+
+	std::vector<Texture> textures;
+	std::vector<Material> materials;
 
 	std::vector<VkDescriptorSet> descriptorSets;
 
@@ -60,7 +65,9 @@ public:
 	bool positionChanged = false;
 
 	uint32_t indices;
+
 	void loadModel(std::string modelPath);
+	void loadModel(std::string modelPath, std::string texturePath);
 	void updateDescriptors(uint32_t idx);
 	void updateModelpos(int keyFlags, float delta);
 	void cleanup();
