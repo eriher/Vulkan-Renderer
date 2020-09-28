@@ -36,6 +36,7 @@ const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
 const std::array<std::pair<std::string, std::string>, 1> MODEL_PATH = { std::make_pair("models/craneo.obj","textures/difuso_flip_oscuro.jpg") };
+const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/cube.obj" };
 
 //const std::array<std::string, 1> MODEL_PATH = { "models/craneo.obj"};
 //const std::string TEXTURE_PATH = "textures/difuso_flip_oscuro.jpg";
@@ -83,6 +84,12 @@ struct UniformBufferObject {
   //alignas(16) glm::mat4 model;
   alignas(16) glm::mat4 view;
   alignas(16) glm::mat4 proj;
+};
+
+struct LightSource {
+  glm::vec4 position;
+  glm::vec4 color;
+  float intensity;
 };
 
 class HelloTriangleApplication {
@@ -177,6 +184,10 @@ private:
   int currentModel = 0;
   std::vector<Model*> models;
 
+  LightSource light;
+  std::vector<VkBuffer> lightBuffer;
+  std::vector<VkDeviceMemory> lightMemory;
+
   void initWindow() {
     glfwInit();
 
@@ -212,7 +223,7 @@ private:
     //loadModels();
 
     createUniformBuffers();
-
+    setupLights();
     createGraphicsPipelines();
 
     setupImGUI();
@@ -517,6 +528,14 @@ private:
   void cleanup() {
     cleanupSwapChain();
 
+    for (auto& pipeline : pipelines) {
+      pipeline->cleanup();
+    }
+
+    for (auto i = 0; i < lightBuffer.size(); i++) {
+      vkDestroyBuffer(device.device, lightBuffer[i], nullptr);
+      vkFreeMemory(device.device, lightMemory[i], nullptr);
+    }
 
     vkDestroyRenderPass(device.device, imGuiRenderPass, nullptr);
 
@@ -779,86 +798,198 @@ private:
     }
   }
 
+
+  void setupLights() {
+    light.color = glm::vec4(1.0f);
+    light.position = glm::vec4(0.0f, 20.0f, 0.0f, 1.0f);
+    light.intensity = 500.0f;
+
+    VkDeviceSize lightBufferSize = sizeof(LightSource);
+    lightBuffer.resize(swapChainImages.size());
+    lightMemory.resize(swapChainImages.size());
+    for (auto i = 0; i < swapChainImages.size(); i++) {
+      device.createBuffer(lightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, lightBuffer[i], lightMemory[i]);
+      void* data;
+      vkMapMemory(device.device, lightMemory[i], 0, lightBufferSize, 0, &data);
+      memcpy(data, &light, lightBufferSize);
+      vkUnmapMemory(device.device, lightMemory[i]);
+    }
+
+  }
+
   void createGraphicsPipelines() {
     //textured models
-    //create descriptorsetlayout
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    {
+      VkDescriptorSetLayout descriptorSetLayout;
+      VkDescriptorSetLayoutBinding uboLayoutBinding{};
+      uboLayoutBinding.binding = 0;
+      uboLayoutBinding.descriptorCount = 1;
+      uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      uboLayoutBinding.pImmutableSamplers = nullptr;
+      uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+      VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+      samplerLayoutBinding.binding = 1;
+      samplerLayoutBinding.descriptorCount = 1;
+      samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      samplerLayoutBinding.pImmutableSamplers = nullptr;
+      samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
+      std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+      VkDescriptorSetLayoutCreateInfo layoutInfo{};
+      layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+      layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+      layoutInfo.pBindings = bindings.data();
 
-    if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create descriptor set layout!");
+      if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+      }
+      //create the pipeline
+      auto pipeline = new Pipeline;
+      pipeline->device = &device;
+      pipeline->descriptorSetLayout = descriptorSetLayout;
+      pipeline->swapChainExtent = swapChainExtent;
+      pipeline->renderPass = renderPass;
+      pipeline->pushConstantSize = sizeof(UniformBufferObject);
+      pipeline->msaaSamples = msaaSamples;
+      pipeline->createGraphicsPipeline("shaders/vert.spv", "shaders/frag.spv");
+      //create the models
+      for (auto& pair : MODEL_PATH) {
+        std::cout << pair.first << std::endl;
+        auto model = new Model();
+        model->device = &device;
+        model->swapChainSize = swapChainImages.size();
+        model->descriptorPool = descriptorPool;
+        model->loadModel(pair.first, pair.second);
+        //model->createDescriptorSetLayout();
+        model->descriptorSetLayout = descriptorSetLayout;
+        model->createDescriptorBuffers();
+        model->createDescriptorSets();
+        pipeline->models.push_back(model);
+        models.push_back(model);
+      }
+
+      pipelines.push_back(pipeline);
     }
-    //create the pipeline
-    auto pipeline = new Pipeline;
-    pipeline->device = &device;
-    pipeline->descriptorSetLayout = descriptorSetLayout;
-    pipeline->swapChainExtent = swapChainExtent;
-    pipeline->renderPass = renderPass;
-    pipeline->pushConstantSize = sizeof(UniformBufferObject);
-    pipeline->msaaSamples = msaaSamples;
-    pipeline->createGraphicsPipeline("shaders/vert.spv","shaders/frag.spv");
-    //create the models
-    for (auto& pair : MODEL_PATH) {
-      std::cout << pair.first << std::endl;
-      auto model = new Model();
-      model->device = &device;
-      model->swapChainSize = swapChainImages.size();
-      model->descriptorPool = descriptorPool;
-      model->loadModel(pair.first, pair.second);
-      //model->createDescriptorSetLayout();
-      model->descriptorSetLayout = descriptorSetLayout;
-      model->createDescriptorBuffers();
-      model->createDescriptorSets();
-      pipeline->models.push_back(model);
-      models.push_back(model);
+    ////MATERIAL MODELS
+    {
+      VkDescriptorSetLayout descriptorSetLayout;
+      VkDescriptorSetLayoutBinding vertLayoutBinding{};
+      vertLayoutBinding.binding = 0;
+      vertLayoutBinding.descriptorCount = 1;
+      vertLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      vertLayoutBinding.pImmutableSamplers = nullptr;
+      vertLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+      VkDescriptorSetLayoutBinding fragLayoutBinding{};
+      fragLayoutBinding.binding = 1;
+      fragLayoutBinding.descriptorCount = 1;
+      fragLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      fragLayoutBinding.pImmutableSamplers = nullptr;
+      fragLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+      VkDescriptorSetLayoutBinding lightLayoutBinding{};
+      lightLayoutBinding.binding = 2;
+      lightLayoutBinding.descriptorCount = 1;
+      lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      lightLayoutBinding.pImmutableSamplers = nullptr;
+      lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+      std::array<VkDescriptorSetLayoutBinding, 3> bindings = { vertLayoutBinding, fragLayoutBinding, lightLayoutBinding };
+      VkDescriptorSetLayoutCreateInfo layoutInfo{};
+      layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+      layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+      layoutInfo.pBindings = bindings.data();
+
+      if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+      }
+
+      auto pipeline = new Pipeline;
+      pipeline->device = &device;
+      pipeline->descriptorSetLayout = descriptorSetLayout;
+      pipeline->swapChainExtent = swapChainExtent;
+      pipeline->renderPass = renderPass;
+      pipeline->pushConstantSize = sizeof(UniformBufferObject);
+      pipeline->msaaSamples = msaaSamples;
+      pipeline->createGraphicsPipeline("shaders/pbr_vert.spv", "shaders/pbr_frag.spv");
+      //create the models
+      for (auto& mpath : MATERIAL_MODEL_PATH) {
+        std::cout << mpath << std::endl;
+        auto model = new Model();
+        model->device = &device;
+        model->swapChainSize = swapChainImages.size();
+        model->descriptorPool = descriptorPool;
+        model->loadModel(mpath);
+        model->modelPos[3][0] = 3.0f;
+        //model->createDescriptorSetLayout();
+        model->descriptorSetLayout = descriptorSetLayout;
+        model->createDescriptorBuffers();
+        model->createMaterialBuffers();
+        //model->createDescriptorSets();
+        //#######TEMP STUFF################
+        std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+        allocInfo.pSetLayouts = layouts.data();
+
+        model->descriptorSets.resize(swapChainImages.size());
+        if (vkAllocateDescriptorSets(device.device, &allocInfo, model->descriptorSets.data()) != VK_SUCCESS) {
+          throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+          VkDescriptorBufferInfo bufferInfo{};
+          bufferInfo.buffer = model->descriptorBuffer[i];
+          bufferInfo.offset = 0;
+          bufferInfo.range = sizeof(glm::mat4);
+
+          VkDescriptorBufferInfo bufferInfo2{};
+          bufferInfo2.buffer = model->materialBuffer[i];
+          bufferInfo2.offset = 0;
+          bufferInfo2.range = sizeof(MaterialProperties);
+
+          VkDescriptorBufferInfo bufferInfo3{};
+          bufferInfo3.buffer = lightBuffer[i];
+          bufferInfo3.offset = 0;
+          bufferInfo3.range = sizeof(LightSource);
+
+          std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+
+          descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+          descriptorWrites[0].dstSet = model->descriptorSets[i];
+          descriptorWrites[0].dstBinding = 0;
+          descriptorWrites[0].dstArrayElement = 0;
+          descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+          descriptorWrites[0].descriptorCount = 1;
+          descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+          descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+          descriptorWrites[1].dstSet = model->descriptorSets[i];
+          descriptorWrites[1].dstBinding = 1;
+          descriptorWrites[1].dstArrayElement = 0;
+          descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+          descriptorWrites[1].descriptorCount = 1;
+          descriptorWrites[1].pBufferInfo = &bufferInfo2;
+
+          descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+          descriptorWrites[2].dstSet = model->descriptorSets[i];
+          descriptorWrites[2].dstBinding = 2;
+          descriptorWrites[2].dstArrayElement = 0;
+          descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+          descriptorWrites[2].descriptorCount = 1;
+          descriptorWrites[2].pBufferInfo = &bufferInfo3;
+
+          vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+        pipeline->models.push_back(model);
+        models.push_back(model);
+      }
+
+      pipelines.push_back(pipeline);
     }
-
-    pipelines.push_back(pipeline);
-
-    pipeline = new Pipeline;
-    pipeline->device = &device;
-    pipeline->descriptorSetLayout = descriptorSetLayout;
-    pipeline->swapChainExtent = swapChainExtent;
-    pipeline->renderPass = renderPass;
-    pipeline->pushConstantSize = sizeof(UniformBufferObject);
-    pipeline->msaaSamples = msaaSamples;
-    pipeline->createGraphicsPipeline("shaders/vert.spv", "shaders/frag.spv");
-    //create the models
-    for (auto& pair : MODEL_PATH) {
-      std::cout << pair.first << std::endl;
-      auto model = new Model();
-      model->device = &device;
-      model->swapChainSize = swapChainImages.size();
-      model->descriptorPool = descriptorPool;
-      model->loadModel(pair.first, pair.second);
-      model->modelPos[3][0] = 3.0f;
-      //model->createDescriptorSetLayout();
-      model->descriptorSetLayout = descriptorSetLayout;
-      model->createDescriptorBuffers();
-      model->createDescriptorSets();
-      pipeline->models.push_back(model);
-      models.push_back(model);
-    }
-
-    pipelines.push_back(pipeline);
     //pbr models
     //create descriptorsetlayout
     //create the pipeline
@@ -1540,7 +1671,8 @@ private:
     models[currentModel]->updateModelpos(keyFlags, deltaFrame);
     models[currentModel]->updateDescriptors(imageIndex);
     updatePushConstant(imageIndex);
-    
+    if(models[currentModel]->materials.size() > 0)
+      models[currentModel]->updateMaterialBuffer(imageIndex);
 
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
       vkWaitForFences(device.device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -1597,21 +1729,6 @@ private:
       if (ImGui::Button("apply"))
         framebufferResized = true;
 
-      //const char* items[] = { "AAAA", "BBBB", "CCCC", "DDDD", "EEEE", "FFFF", "GGGG", "HHHH", "IIII", "JJJJ", "KKKK", "LLLLLLL", "MMMM", "OOOOOOO", "PPPP", "QQQQQQQQQQ", "RRR", "SSSS" };
-      //static const char* current_item = NULL;
-      const char* items[] = { "model_1", "model_2" };
-      if (ImGui::BeginCombo("##combo", items[currentModel])) // The second parameter is the label previewed before opening the combo.
-      {
-        for (int n = 0; n < 2; n++)
-        {
-          bool is_selected = (n == currentModel); // You can store your selection however you want, outside or inside your objects
-          if (ImGui::Selectable(items[n], is_selected))
-            currentModel = n;
-          if (is_selected)
-            ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
-        }
-        ImGui::EndCombo();
-      }
       ImGui::Text("Camera Control");
 
       if (cameraView && ImGui::Button("Switch to Model view")){
@@ -1629,6 +1746,34 @@ private:
         ImGui::Text("real radius: %.3f",r);
       }
 
+      ImGui::Text("Model Select");
+      if (ImGui::BeginCombo("##combo", models[currentModel]->name.c_str())) // The second parameter is the label previewed before opening the combo.
+      {
+        for (int n = 0; n < 2; n++)
+        {
+          bool is_selected = (n == currentModel); // You can store your selection however you want, outside or inside your objects
+          if (ImGui::Selectable(models[n]->name.c_str(), is_selected))
+            currentModel = n;
+          if (is_selected)
+            ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+        }
+        ImGui::EndCombo();
+      }
+      
+
+      if(models[currentModel]->materials.size() > 0){
+        ImGui::Text("Material Name %s", models[currentModel]->materials[0].m_name.c_str());
+        ImGui::ColorEdit3("Color", &models[currentModel]->materials[0].properties.m_color.x);
+        ImGui::SliderFloat("Reflectivity", &models[currentModel]->materials[0].properties.m_reflectivity, 0.0f, 1.0f);
+        ImGui::SliderFloat("Metalness", &models[currentModel]->materials[0].properties.m_metalness, 0.0f, 1.0f);
+        ImGui::SliderFloat("Fresnel", &models[currentModel]->materials[0].properties.m_fresnel, 0.0f, 1.0f);
+        ImGui::SliderFloat("shininess", &models[currentModel]->materials[0].properties.m_shininess, 0.0f, 25000.0f);
+        ImGui::SliderFloat("Emission", &models[currentModel]->materials[0].properties.m_emission, 0.0f, 1.0f);
+      }
+
+      //if (ImGui::Button("Reload Shaders")) {
+      //  models[currentModel]->updateMaterialBuffer(imageIndex);
+      //}
 
       ImGui::End();
 

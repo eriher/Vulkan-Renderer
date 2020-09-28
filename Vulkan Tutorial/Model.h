@@ -11,7 +11,7 @@
 #include <string>
 
 struct MaterialProperties {
-	glm::vec3	color;
+	glm::vec4	m_color;
 	float		m_reflectivity;
 	float		m_shininess;
 	float		m_metalness;
@@ -46,6 +46,8 @@ class Model {
 public:
 	Device* device;
 
+	std::string name;
+
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 
@@ -64,6 +66,9 @@ public:
 	std::vector<VkBuffer> descriptorBuffer;
 	std::vector<VkDeviceMemory> descriptorMemory;
 
+	std::vector<VkBuffer> materialBuffer;
+	std::vector<VkDeviceMemory> materialMemory;
+
 	glm::mat4 modelPos = glm::mat4(1.0f);
 	float yaw = -90;
 	float pitch = 0;
@@ -78,5 +83,7 @@ public:
 	void createDescriptorSetLayout();
 	void createDescriptorSets();
 	void createDescriptorBuffers();
+	void updateMaterialBuffer(uint32_t idx);
+	void createMaterialBuffers();
 	void cleanup();
 };
