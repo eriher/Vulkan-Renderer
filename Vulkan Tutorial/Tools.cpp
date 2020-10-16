@@ -1,5 +1,2 @@
-#include "vulkan/vulkan.h"
+#include "Tools.h"
 
-class Tools {
-
-};

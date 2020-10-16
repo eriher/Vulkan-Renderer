@@ -104,6 +104,9 @@ public:
 	VkCommandPool resetCommandPool;
 	VkCommandPool transferCommandPool;
 
+	VkDescriptorPool descriptorPool;
+
+	void createDescriptorPool();
 
 	void initDevice(VkPhysicalDevice pDevice, QueueFamilyIndices qfi, bool enableValidationLayers);
 	//createBuffer

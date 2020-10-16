@@ -3,8 +3,15 @@
 #include "stb_image.h"
 #include "Device.h"
 #include <iostream>
+#include "HdrTexture.h"
+#include "Tools.h"
+#include "Model.h"
 class SkyboxTexture
 {
+	struct OffscreenUbo {
+		glm::mat4 proj;
+		glm::mat4 views[6];
+	};
 	public:
 		Device*								device;
 		VkImage               image;
@@ -14,8 +21,8 @@ class SkyboxTexture
 		VkSampler             sampler;
 		uint32_t mipLevels;
 		int texWidth, texHeight, texChannels;
-		void load(const std::string& filename);
-		void loadHdr(const std::string& filename);
+		void load(const std::string& );
+		void loadHdr(const std::string& , int, Model&);
 		void createImage();
 		void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
 		void copyBufferToImage(std::vector<VkBuffer>&);

@@ -26,6 +26,11 @@ void Model::cleanup() {
 		vkDestroyBuffer(device->device, materialBuffer[i], nullptr);
 		vkFreeMemory(device->device, materialMemory[i], nullptr);
 	}
+
+	for (auto i = 0; i < descriptorBuffer.size(); i++) {
+		vkDestroyBuffer(device->device, descriptorBuffer[i], nullptr);
+		vkFreeMemory(device->device, descriptorMemory[i], nullptr);
+	}
 	vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
 };
 
@@ -198,7 +203,7 @@ void Model::createDescriptorSets() {
 	std::vector<VkDescriptorSetLayout> layouts(swapChainSize, descriptorSetLayout);
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorPool = device->descriptorPool;
 	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize);
 	allocInfo.pSetLayouts = layouts.data();
 

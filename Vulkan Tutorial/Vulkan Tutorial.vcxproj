@@ -32,7 +32,6 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="HelloTriangleApplicaiton.cpp" />
     <ClCompile Include="Pipeline.cpp" />
-    <ClCompile Include="Skybox.cpp" />
     <ClCompile Include="SkyboxTexture.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Tools.cpp" />
@@ -46,9 +45,9 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="Pipeline.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Skybox.h" />
     <ClInclude Include="SkyboxTexture.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="Tools.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan Tutorial.rc" />

@@ -1,11 +1,42 @@
 #include "Device.h"
 
+void Device::createDescriptorPool() {
+
+	VkDescriptorPoolSize pool_sizes[11] =
+	{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 }
+	};
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 100 * 11;
+	pool_info.poolSizeCount = 11;
+	pool_info.pPoolSizes = pool_sizes;
+
+
+	if (vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor pool!");
+	}
+
+}
 
 	void Device::cleanup() {
 		vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
 		vkDestroyCommandPool(device, transientCommandPool, nullptr);
 		vkDestroyCommandPool(device, resetCommandPool, nullptr);
 		vkDestroyCommandPool(device, transferCommandPool, nullptr);
+		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 		vkDestroyDevice(device, nullptr);
 	}
 
@@ -15,6 +46,7 @@
 			GetPhysicalDeviceProperties();
 			createLogicalDevice(enableValidationLayers);
 			createCommandPools();
+			createDescriptorPool();
 	}
 	//createBuffer
 

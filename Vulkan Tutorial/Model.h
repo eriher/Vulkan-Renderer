@@ -59,7 +59,6 @@ public:
 
 	uint32_t swapChainSize;
 
-	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
 	std::vector<VkDescriptorSet> descriptorSets;
 
