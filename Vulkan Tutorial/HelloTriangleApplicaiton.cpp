@@ -943,98 +943,7 @@ private:
 
   }
 
-  void updateSkybox() {
-    VkCommandBuffer commandBuffer = device.beginSingleTimeCommands(device.transferCommandPool);
-
-    VkImageMemoryBarrier dstBarrier{};
-    dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    dstBarrier.image = sTex.image;
-    dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    dstBarrier.subresourceRange.baseMipLevel = 0;
-    dstBarrier.subresourceRange.levelCount = 1;
-    dstBarrier.subresourceRange.baseArrayLayer = 0;
-    dstBarrier.subresourceRange.layerCount = 6;
-    dstBarrier.srcAccessMask = 0;
-    dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    vkCmdPipelineBarrier(
-      commandBuffer,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-      0,
-      0, nullptr,
-      0, nullptr,
-      1, &dstBarrier
-    );
-
-    VkImageMemoryBarrier srcBarrier{};
-    srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    srcBarrier.image = offscreenTexture.image;
-    srcBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    srcBarrier.subresourceRange.baseMipLevel = 0;
-    srcBarrier.subresourceRange.levelCount = 1;
-    srcBarrier.subresourceRange.baseArrayLayer = 0;
-    srcBarrier.subresourceRange.layerCount = 1;
-    srcBarrier.srcAccessMask = 0;
-    srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    vkCmdPipelineBarrier(
-      commandBuffer,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-      0,
-      0, nullptr,
-      0, nullptr,
-      1, &srcBarrier
-    );
-
-    VkImageCopy imageCopyRegion{};
-    imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopyRegion.srcSubresource.layerCount = 1;
-    imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopyRegion.dstSubresource.layerCount = 1;
-    imageCopyRegion.extent.width = offscreenDim;
-    imageCopyRegion.extent.height = offscreenDim;
-    imageCopyRegion.extent.depth = 1;
-    imageCopyRegion.dstSubresource.mipLevel = 0;
-    vkCmdCopyImage(commandBuffer,offscreenTexture.image,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, sTex.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1, &imageCopyRegion);
-   
-    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    dstBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    dstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    dstBarrier.dstAccessMask = 0;
-
-    vkCmdPipelineBarrier(
-      commandBuffer,
-      VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      0,
-      0, nullptr,
-      0, nullptr,
-      1, &dstBarrier
-    );
-
-    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    srcBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    srcBarrier.dstAccessMask = 0;
-
-    vkCmdPipelineBarrier(
-      commandBuffer,
-      VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      0,
-      0, nullptr,
-      0, nullptr,
-      1, &srcBarrier
-    );
-
-    device.endSingleTimeCommands(device.transferCommandPool, device.transferQueue, commandBuffer);
-  }
+ 
 
   void setupOffscreenTexture() {
     offscreenTexture.device = &device;
@@ -1057,7 +966,7 @@ private:
 
 
     //offscreenUbo.proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 1.0f);
-    offscreenUbo.proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    //offscreenUbo.proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     //offscreenUbo.proj[1][1] *= -1;
     //offscreenUbo.view = glm::mat4(1.0f);
     
@@ -1075,29 +984,12 @@ private:
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     //colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    //colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription colorAttachmentResolve{};
-    colorAttachmentResolve.format = swapChainImageFormat;
-    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    //colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    //colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    //colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentResolveRef{};
-    colorAttachmentResolveRef.attachment = 1;
-    colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -1142,6 +1034,18 @@ private:
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
+    const uint32_t viewMask = 0b00111111;
+    const uint32_t correlationMask = 0b00111111;
+
+    VkRenderPassMultiviewCreateInfo renderPassMultiviewCI{};
+    renderPassMultiviewCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
+    renderPassMultiviewCI.subpassCount = 1;
+    renderPassMultiviewCI.pViewMasks = &viewMask;
+    renderPassMultiviewCI.correlationMaskCount = 1;
+    renderPassMultiviewCI.pCorrelationMasks = &correlationMask;
+
+    renderPassInfo.pNext = &renderPassMultiviewCI;
+
     if (vkCreateRenderPass(device.device, &renderPassInfo, nullptr, &offscreenRenderPass) != VK_SUCCESS) {
       throw std::runtime_error("failed to create render pass!");
     }
@@ -1149,7 +1053,7 @@ private:
 
   void createOffscreenFramebuffer() {
     std::array<VkImageView, 1> attachments = {
-      offscreenTexture.view,
+      sTex.view,
       //swapChainImageViews2[0]
     };
     VkFramebufferCreateInfo framebufferInfo{};
@@ -1195,6 +1099,18 @@ private:
     }
 
     {
+
+      //VkPhysicalDeviceProperties2KHR deviceProps2{};
+      //VkPhysicalDeviceMultiviewPropertiesKHR extProps{};
+      //extProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES_KHR;
+      //deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
+      //deviceProps2.pNext = &extProps;
+      //PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR"));
+      //vkGetPhysicalDeviceProperties2KHR(device.physicalDevice, &deviceProps2);
+      //std::cout << "Multiview properties:" << std::endl;
+      //std::cout << "\tmaxMultiviewViewCount = " << extProps.maxMultiviewViewCount << std::endl;
+      //std::cout << "\tmaxMultiviewInstanceIndex = " << extProps.maxMultiviewInstanceIndex << std::endl;
+
       auto vertShaderCode = readFile("shaders/cubemap_vert.spv");
       auto fragShaderCode = readFile("shaders/cubemap_frag.spv");
 
@@ -1258,9 +1174,9 @@ private:
       rasterizer.rasterizerDiscardEnable = VK_FALSE;
       rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
       rasterizer.lineWidth = 1.0f;
-      rasterizer.cullMode = VK_CULL_MODE_NONE;
+      //rasterizer.cullMode = VK_CULL_MODE_NONE;
       //rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
-      //rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+      rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
       rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
       rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -1284,18 +1200,20 @@ private:
       colorBlending.blendConstants[2] = 0.0f;
       colorBlending.blendConstants[3] = 0.0f;
 
-      VkPushConstantRange pushConstantRange{};
-      pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-      pushConstantRange.offset = 0;
-      pushConstantRange.size = sizeof(UniformBufferObject);
+
 
       VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
       pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
       pipelineLayoutInfo.setLayoutCount = 1;
       pipelineLayoutInfo.pSetLayouts = &offscreenDescriptorSetLayout;
 
-      pipelineLayoutInfo.pushConstantRangeCount = 1;
-      pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+      //VkPushConstantRange pushConstantRange{};
+      //pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+      //pushConstantRange.offset = 0;
+      //pushConstantRange.size = sizeof(UniformBufferObject);
+
+      //pipelineLayoutInfo.pushConstantRangeCount = 1;
+      //pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
       if (vkCreatePipelineLayout(device.device, &pipelineLayoutInfo, nullptr, &offscreenPipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
@@ -1337,27 +1255,27 @@ private:
     offscreenModel.descriptorPool = descriptorPool;
     offscreenModel.loadModel("skybox/cube.obj");
     offscreenModel.descriptorSetLayout = offscreenDescriptorSetLayout;
-    offscreenModel.createDescriptorBuffers();
+    //offscreenModel.createDescriptorBuffers();
     
-    //VkDeviceSize bufferSize = sizeof(OffscreenUbo);
-    //offscreenModel.descriptorBuffer.resize(1);
-    //offscreenModel.descriptorMemory.resize(1);
+    VkDeviceSize bufferSize = sizeof(OffscreenUbo);
+    offscreenModel.descriptorBuffer.resize(1);
+    offscreenModel.descriptorMemory.resize(1);
 
-    //OffscreenUbo wut = { glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f),  {
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    // glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-    //}};
+    OffscreenUbo wut = { glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f),  {
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+    }};
 
 
-    //device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, offscreenModel.descriptorBuffer[0], offscreenModel.descriptorMemory[0]);
-    //void* data;
-    //vkMapMemory(device.device, offscreenModel.descriptorMemory[0], 0, sizeof(OffscreenUbo), 0, &data);
-    //memcpy(data, &wut, sizeof(OffscreenUbo));
-    //vkUnmapMemory(device.device, offscreenModel.descriptorMemory[0]);
+    device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, offscreenModel.descriptorBuffer[0], offscreenModel.descriptorMemory[0]);
+    void* data;
+    vkMapMemory(device.device, offscreenModel.descriptorMemory[0], 0, sizeof(OffscreenUbo), 0, &data);
+    memcpy(data, &wut, sizeof(OffscreenUbo));
+    vkUnmapMemory(device.device, offscreenModel.descriptorMemory[0]);
     
 
     //allocate descriptorsets
@@ -1377,8 +1295,8 @@ private:
       VkDescriptorBufferInfo bufferInfo{};
       bufferInfo.buffer = offscreenModel.descriptorBuffer[0];
       bufferInfo.offset = 0;
-      bufferInfo.range = sizeof(glm::mat4);
-      //bufferInfo.range = sizeof(OffscreenUbo);
+      //bufferInfo.range = sizeof(glm::mat4);
+      bufferInfo.range = sizeof(OffscreenUbo);
 
       VkDescriptorImageInfo imageInfo{};
       imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1440,10 +1358,10 @@ private:
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = clearValues;
 
-    for(int i = 0; i < offScreencaptureViews.size();i++){
+    //for(int i = 0; i < offScreencaptureViews.size();i++){
     vkCmdBeginRenderPass(offscreenCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    offscreenUbo.view = offScreencaptureViews[i];
-    vkCmdPushConstants(offscreenCommandBuffer, offscreenPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&offscreenUbo);
+    //offscreenUbo.view = offScreencaptureViews[];
+    //vkCmdPushConstants(offscreenCommandBuffer, offscreenPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&offscreenUbo);
 
     VkDeviceSize offsets[1] = { 0 };
 
@@ -1458,34 +1376,7 @@ private:
 
     vkCmdEndRenderPass(offscreenCommandBuffer);
 
-    //VkImageMemoryBarrier preBarrier{};
-    //preBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-
-    //preBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    //preBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    //preBarrier.image = sTex.image;
-    //preBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //preBarrier.subresourceRange.baseMipLevel = 0;
-    //preBarrier.subresourceRange.levelCount = 1;
-    //preBarrier.subresourceRange.baseArrayLayer = i;
-    //preBarrier.subresourceRange.layerCount = 1;
-
-    //preBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    //preBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-    //preBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    //preBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    //vkCmdPipelineBarrier(
-    //  offscreenCommandBuffer,
-    //  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-    //  0,
-    //  0, nullptr,
-    //  0, nullptr,
-    //  1, &preBarrier
-    //);
-
-    {
+    /*{
       VkImageCopy imageCopyRegion{};
       imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
       imageCopyRegion.srcSubresource.baseArrayLayer = 0;
@@ -1529,75 +1420,9 @@ private:
         0, nullptr,
         1, &dstBarrier
       );
-    }
+    }*/
 
-
-
-    //vkCmdBeginRenderPass(offscreenCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    //offscreenUbo.view = offScreencaptureViews[1];
-    //vkCmdPushConstants(offscreenCommandBuffer, offscreenPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&offscreenUbo);
-
-    ////VkDeviceSize offsets[1] = { 0 };
-
-
-    ////VkBuffer vertexBuffers[] = { offscreenModel.vertexBuffer };
-    //vkCmdBindPipeline(offscreenCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipeline);
-    //vkCmdBindDescriptorSets(offscreenCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout, 0, 1, &offscreenModel.descriptorSets[0], 0, nullptr);
-    //vkCmdBindVertexBuffers(offscreenCommandBuffer, 0, 1, vertexBuffers, offsets);
-    //vkCmdBindIndexBuffer(offscreenCommandBuffer, offscreenModel.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-    //vkCmdDrawIndexed(offscreenCommandBuffer, offscreenModel.indices, 1, 0, 0, 0);
-
-
-    //vkCmdEndRenderPass(offscreenCommandBuffer);
-
-
-    //{
-    //  VkImageCopy imageCopyRegion{};
-    //  imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //  imageCopyRegion.srcSubresource.baseArrayLayer = 0;
-    //  imageCopyRegion.srcSubresource.layerCount = 1;
-    //  imageCopyRegion.srcSubresource.mipLevel = 0;
-
-    //  imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //  imageCopyRegion.dstSubresource.layerCount = 6;
-    //  imageCopyRegion.dstSubresource.baseArrayLayer = 1;
-    //  imageCopyRegion.dstSubresource.mipLevel = 0;
-
-    //  imageCopyRegion.extent.width = offscreenDim;
-    //  imageCopyRegion.extent.height = offscreenDim;
-    //  imageCopyRegion.extent.depth = 1;
-
-    //  vkCmdCopyImage(offscreenCommandBuffer, offscreenTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, sTex.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopyRegion);
     //}
-    //{
-    //  VkImageMemoryBarrier dstBarrier{};
-    //  dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-
-    //  dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    //  dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    //  dstBarrier.image = sTex.image;
-    //  dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //  dstBarrier.subresourceRange.baseMipLevel = 0;
-    //  dstBarrier.subresourceRange.levelCount = 1;
-    //  dstBarrier.subresourceRange.baseArrayLayer = 1;
-    //  dstBarrier.subresourceRange.layerCount = 6;
-
-    //  dstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    //  dstBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    //  dstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    //  dstBarrier.dstAccessMask = 0;
-
-    //  vkCmdPipelineBarrier(
-    //    offscreenCommandBuffer,
-    //    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-    //    0,
-    //    0, nullptr,
-    //    0, nullptr,
-    //    1, &dstBarrier
-    //  );
-    //}
-    }
 
     if (vkEndCommandBuffer(offscreenCommandBuffer) != VK_SUCCESS) {
       throw std::runtime_error("failed to record command buffer!");
@@ -1606,12 +1431,12 @@ private:
   
   void renderOffscreen() {
     //for (int i = 0; i < offScreencaptureViews.size(); i++) {
-      auto pushConstantCB = device.beginSingleTimeCommands();
-      offscreenUbo.view = offScreencaptureViews[0];
-      vkCmdPushConstants(pushConstantCB, offscreenPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&offscreenUbo);
-      vkEndCommandBuffer(pushConstantCB);
-      std::array<VkCommandBuffer, 2> submitCommandBuffers =
-      { pushConstantCB, offscreenCommandBuffer };
+      //auto pushConstantCB = device.beginSingleTimeCommands();
+      //offscreenUbo.view = offScreencaptureViews[0];
+      //vkCmdPushConstants(pushConstantCB, offscreenPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&offscreenUbo);
+      //vkEndCommandBuffer(pushConstantCB);
+      //std::array<VkCommandBuffer, 2> submitCommandBuffers =
+      //{ pushConstantCB, offscreenCommandBuffer };
       VkSubmitInfo submitInfo{};
       submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
       submitInfo.commandBufferCount = 1;

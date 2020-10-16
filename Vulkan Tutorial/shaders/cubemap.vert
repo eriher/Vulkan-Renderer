@@ -1,13 +1,9 @@
 #version 450
-
-layout(push_constant) uniform UniformBufferObject {
-    mat4 view;
-    mat4 proj;
+#extension GL_EXT_multiview : enable
+layout(binding = 0) uniform UBO {
+  mat4 proj;
+  mat4 view[6];
 } ubo;
-
-layout(binding = 0) uniform Model {
-  mat4 pos;
-} model;
 
 
 layout(location = 0) in vec3 inPosition;
@@ -20,5 +16,5 @@ layout (location = 0) out vec3 localPos;
 void main()
 {
     localPos = inPosition;  
-    gl_Position =  (ubo.proj * ubo.view * vec4(localPos, 1.0)).xyww;
+    gl_Position =  (ubo.proj * ubo.view[gl_ViewIndex] * vec4(localPos, 1.0)).xyww;
 }
