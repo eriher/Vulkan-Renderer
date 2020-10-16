@@ -25,21 +25,29 @@
     <ClCompile Include="..\..\..\..\..\..\gfx\Libraries\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\..\..\..\..\..\gfx\Libraries\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\..\..\..\..\..\gfx\Libraries\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="cubeMap.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="Gui.cpp" />
+    <ClCompile Include="HdrTexture.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="HelloTriangleApplicaiton.cpp" />
     <ClCompile Include="Pipeline.cpp" />
+    <ClCompile Include="Skybox.cpp" />
+    <ClCompile Include="SkyboxTexture.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Tools.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cubeMap.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="Gui.h" />
+    <ClInclude Include="HdrTexture.h" />
     <ClInclude Include="HelloTriangleApplication.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Pipeline.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Skybox.h" />
+    <ClInclude Include="SkyboxTexture.h" />
     <ClInclude Include="Texture.h" />
   </ItemGroup>
   <ItemGroup>

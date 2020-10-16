@@ -2,3 +2,9 @@ C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shader.vert -o vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shader.frag -o frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe pbr_shader.vert -o pbr_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe pbr_shader.frag -o pbr_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe skybox.vert -o skybox_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe skybox.frag -o skybox_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.vert -o equi_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.frag -o equi_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.vert -o cubemap_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.frag -o cubemap_frag.spv

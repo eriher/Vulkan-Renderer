@@ -39,7 +39,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	if(direction <= 0)
 		return vec3(0.0);
 	//return vec3(0.5);
-	vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightPos - viewSpacePosition),2));
+	vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightPos - viewSpacePosition),2.0));
 	//return li;
 	///////////////////////////////////////////////////////////////////////////
 	// Task 1.3 - Calculate the diffuse term and return that as the result
@@ -54,9 +54,9 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	
 	vec3 wh = normalize(wi + wo);
 	float s = m.shininess;
-	float f = m.fresnel + (1 - m.fresnel)*pow((1 - dot(wi,wh)),5);
-	float d = (s+2)/(2*PI) * pow(dot(n,wh),s);
-	float g = min(1, min(2*((dot(n,wh)*dot(n,wo))/dot(wo,wh)),2*((dot(n,wh)*dot(n,wi))/dot(wo,wh))));
+	float f = m.fresnel + (1 - m.fresnel)*pow((1 - max(dot(wi,wh),0.0)),5.0);
+	float d = (s+2.0)/(2.0*PI) * pow(dot(n,wh),s);
+	float g = min(1, min(2.0*((dot(n,wh)*dot(n,wo))/dot(wo,wh)),2.0*((dot(n,wh)*dot(n,wi))/dot(wo,wh))));
 	float brdf = (f*d*g)/(4*dot(n,wo)*dot(n,wi));
 	//return brdf * dot(n, wi) * li; 
 	///////////////////////////////////////////////////////////////////////////
@@ -68,6 +68,8 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	return m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term;
 	//return vec3(material_color);
 }
+
+
 
 void main() {
     //outColor = texture(texSampler, fragTexCoord);
@@ -81,8 +83,12 @@ void main() {
 	}
 	
 	vec3 emission_term = m.emission * m.color.xyz;
+	vec3 color = emission_term+direct_illumination_term;
 
-	outColor = vec4(direct_illumination_term+emission_term,1.0);
+	//color = color / (color + vec3(1.0));
+	//color = pow(color, vec3(1.0/2.2)); 
+
+	outColor = vec4(color,1.0);
 
 }
 
