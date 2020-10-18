@@ -1,6 +1,14 @@
 #include "SkyboxTexture.h"
 #define STB_IMAGE_IMPLEMENTATION
 
+void SkyboxTexture::cleanup() {
+  vkDestroySampler(device->device, sampler, nullptr);
+  vkDestroyImageView(device->device, view, nullptr);
+
+  vkDestroyImage(device->device, image, nullptr);
+  vkFreeMemory(device->device, deviceMemory, nullptr);
+}
+
 void SkyboxTexture::load(const std::string& directory) {
   const std::array<std::string, 6> directions = {"right","left","top","bottom","front","back"};
   std::vector<VkBuffer> buffers;
@@ -47,7 +55,7 @@ void SkyboxTexture::load(const std::string& directory) {
 
 }
 
-void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
+void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model* model)
 {
   texWidth = dim;
   texHeight = dim;
@@ -304,10 +312,8 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
   //offscreenModel.descriptorSetLayout = descriptorSetLayout;
 
   VkDeviceSize bufferSize = sizeof(OffscreenUbo);
-  model.descriptorBuffer.resize(1);
-  model.descriptorMemory.resize(1);
 
-  OffscreenUbo wut = { glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f),  {
+  OffscreenUbo ubo = { glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f),  {
    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
@@ -316,13 +322,16 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
   } };
 
+  VkBuffer buffer;
+  VkDeviceMemory memory;
 
-  device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, model.descriptorBuffer[0], model.descriptorMemory[0]);
+  device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer, memory);
   void* data;
-  vkMapMemory(device->device, model.descriptorMemory[0], 0, sizeof(OffscreenUbo), 0, &data);
-  memcpy(data, &wut, sizeof(OffscreenUbo));
-  vkUnmapMemory(device->device, model.descriptorMemory[0]);
+  vkMapMemory(device->device, memory, 0, sizeof(OffscreenUbo), 0, &data);
+  memcpy(data, &ubo, sizeof(OffscreenUbo));
+  vkUnmapMemory(device->device, memory);
 
+  VkDescriptorSet descriptorSet;
 
   //allocate descriptorsets
   {
@@ -333,13 +342,12 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
     allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
     allocInfo.pSetLayouts = layouts.data();
 
-    model.descriptorSets.resize(1);
-    if (vkAllocateDescriptorSets(device->device, &allocInfo, model.descriptorSets.data()) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device->device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
       throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
     VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = model.descriptorBuffer[0];
+    bufferInfo.buffer = buffer;
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(OffscreenUbo);
 
@@ -351,7 +359,7 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
     std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = model.descriptorSets[0];
+    descriptorWrites[0].dstSet = descriptorSet;
     descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -359,7 +367,7 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
     descriptorWrites[0].pBufferInfo = &bufferInfo;
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = model.descriptorSets[0];
+    descriptorWrites[1].dstSet = descriptorSet;
     descriptorWrites[1].dstBinding = 1;
     descriptorWrites[1].dstArrayElement = 0;
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -406,12 +414,12 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
   VkDeviceSize offsets[1] = { 0 };
 
 
-  VkBuffer vertexBuffers[] = { model.vertexBuffer };
+  VkBuffer vertexBuffers[] = { model->vertexBuffer };
   vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &model.descriptorSets[0], 0, nullptr);
+  vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
   vkCmdBindVertexBuffers(commands, 0, 1, vertexBuffers, offsets);
-  vkCmdBindIndexBuffer(commands, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(commands, model.indices, 1, 0, 0, 0);
+  vkCmdBindIndexBuffer(commands, model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdDrawIndexed(commands, model->indices, 1, 0, 0, 0);
 
 
   vkCmdEndRenderPass(commands);
@@ -428,12 +436,13 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim, Model& model)
   if (vkQueueSubmit(device->graphicsQueue, 1, &submitInfo, nullptr) != VK_SUCCESS) {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
-  //cleanup
   vkDeviceWaitIdle(device->device);
+  //cleanup
+  hdrTex.cleanup();
   vkFreeCommandBuffers(device->device, device->transientCommandPool, 1, &commands);
 
-  vkDestroyBuffer(device->device, model.descriptorBuffer[0], nullptr);
-  vkFreeMemory(device->device, model.descriptorMemory[0], nullptr);
+  vkDestroyBuffer(device->device, buffer, nullptr);
+  vkFreeMemory(device->device, memory, nullptr);
   
   vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
 

@@ -1,6 +1,13 @@
 #include "HdrTexture.h"
 #define STB_IMAGE_IMPLEMENTATION
 
+void HdrTexture::cleanup() {
+  vkDestroySampler(device->device, sampler, nullptr);
+  vkDestroyImageView(device->device,view, nullptr);
+  vkDestroyImage(device->device, image, nullptr);
+  vkFreeMemory(device->device, deviceMemory, nullptr);
+}
+
 void HdrTexture::load(const std::string& fpath) {
 
   stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);

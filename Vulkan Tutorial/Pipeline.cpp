@@ -170,6 +170,7 @@ void Pipeline::cleanup()
     model->cleanup();
     delete model;
   }
+  vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
   vkDestroyPipeline(device->device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);
 }

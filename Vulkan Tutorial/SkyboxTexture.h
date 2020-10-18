@@ -22,7 +22,7 @@ class SkyboxTexture
 		uint32_t mipLevels;
 		int texWidth, texHeight, texChannels;
 		void load(const std::string& );
-		void loadHdr(const std::string& , int, Model&);
+		void loadHdr(const std::string& , int, Model*);
 		void createImage();
 		void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
 		void copyBufferToImage(std::vector<VkBuffer>&);

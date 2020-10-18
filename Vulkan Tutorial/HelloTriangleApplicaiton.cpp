@@ -107,12 +107,10 @@ public:
 
 private:
   GLFWwindow* window;
-  GLFWwindow* window2;
 
   VkInstance instance;
   VkDebugUtilsMessengerEXT debugMessenger;
   VkSurfaceKHR surface;
-  VkSurfaceKHR surface2;
 
   //VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_2_BIT;
@@ -126,11 +124,6 @@ private:
   std::vector<VkImageView> swapChainImageViews;
   std::vector<VkFramebuffer> swapChainFramebuffers;
   VkColorSpaceKHR swapChainColorSpace;
-
-  VkSwapchainKHR swapChain2;
-  std::vector<VkImage> swapChainImages2;
-  std::vector<VkImageView> swapChainImageViews2;
-  std::vector<VkFramebuffer> swapChainFramebuffers2;
 
   VkRenderPass renderPass;
 
@@ -198,54 +191,18 @@ private:
   std::vector<VkBuffer> lightBuffer;
   std::vector<VkDeviceMemory> lightMemory;
 
-  Model skyboxModel;
-  SkyboxTexture sTex;
-  
+  //Model skyboxModel;
+  //Model* skyboxModel;
+  //SkyboxTexture sTex;
 
-  cubeMap cubeMap;
+  struct {
+    Model* model;
+    SkyboxTexture texture;
+    Pipeline pipeline;
+  } skybox;
 
-
-  //Texture offscreenTexture;
-
-  VkRenderPass offscreenRenderPass;
-  VkFramebuffer offscreenFramebuffer;
-  VkDescriptorSetLayout offscreenDescriptorSetLayout;
-  Model offscreenModel;
-  VkPipeline offscreenPipeline;
-  VkPipelineLayout offscreenPipelineLayout;
-  HdrTexture offscreenHDR;
-
-  VkCommandBuffer offscreenCommandBuffer;
-  const uint32_t offscreenDim = 2048;
-  const VkFormat offscreenFormat = VK_FORMAT_R8G8B8A8_SRGB;
-  //const VkFormat offscreenFormat = VK_FORMAT_B8G8R8A8_SRGB;
-  VkEvent offscreenEvent;
-
-  UniformBufferObject offscreenUbo;
-
-  VkPipeline offscreenPipeline2;
-  VkPipelineLayout offscreenPipelineLayout2;
-  Model offscreenModel2;
-
-  //VkSemaphore offscreenImageAvailableSemaphore;
-  //VkSemaphore offscreenRenderFinishedSemaphore;
-
-  //std::array<glm::mat4,6> offScreencaptureViews =
-  //{
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-  //   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-  //};
 
   int zcounter = 1;
-
-  struct OffscreenUbo {
-    glm::mat4 proj;
-    glm::mat4 views[6];
-  };
 
   void initWindow() {
     glfwInit();
@@ -622,6 +579,11 @@ private:
       pipeline->cleanup();
     }
 
+    skybox.texture.cleanup();
+    skybox.model->cleanup();
+    delete skybox.model;
+    skybox.pipeline.cleanup();
+
     for (auto i = 0; i < lightBuffer.size(); i++) {
       vkDestroyBuffer(device.device, lightBuffer[i], nullptr);
       vkFreeMemory(device.device, lightMemory[i], nullptr);
@@ -752,12 +714,6 @@ private:
     }
   }
 
-  void createSurface2() {
-    if (glfwCreateWindowSurface(instance, window2, nullptr, &surface2) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create window surface!");
-    }
-  }
-
   void createSwapChain() {
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device.physicalDevice);
 
@@ -810,28 +766,6 @@ private:
     swapChainExtent = extent;
     swapChainColorSpace = surfaceFormat.colorSpace;
     
-  }
-
-  void createSwapchain2() {
-    VkSwapchainCreateInfoKHR createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
-
-    createInfo.minImageCount = 1;
-    createInfo.imageFormat = swapChainImageFormat;
-    createInfo.imageColorSpace = swapChainColorSpace;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    //FOR THE SECOND window
-    createInfo.imageExtent = { offscreenDim, offscreenDim };
-    createInfo.surface = surface2;
-    if (vkCreateSwapchainKHR(device.device, &createInfo, nullptr, &swapChain2) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create swap chain!");
-    }
-    uint32_t imgcount = 1;
-    vkGetSwapchainImagesKHR(device.device, swapChain2, &imgcount, nullptr);
-    swapChainImages2.resize(imgcount);
-    vkGetSwapchainImagesKHR(device.device, swapChain2, &imgcount, swapChainImages2.data());
   }
 
   void createRenderPass() {
@@ -910,16 +844,18 @@ private:
 
 
   void createSkybox() {
-    skyboxModel.device = &device;
-    skyboxModel.swapChainSize = swapChainImages.size();
-    skyboxModel.loadModel("skybox/cube.obj");
+    skybox.model = new Model;
+    skybox.model->device = &device;
+    skybox.model->swapChainSize = swapChainImages.size();
+    skybox.model->loadModel("skybox/cube.obj");
     //SkyboxTexture sTex;
-    sTex.device = &device;
-    sTex.loadHdr("envmaps/001.hdr",offscreenDim, skyboxModel);
+    skybox.texture.device = &device;
+    skybox.texture.loadHdr("envmaps/001.hdr",2048, skybox.model);
     //sTex.load("envmaps/001.hdr");
 
 
     VkDescriptorSetLayout descriptorSetLayout;
+    {
     VkDescriptorSetLayoutBinding vertLayoutBinding{};
     vertLayoutBinding.binding = 0;
     vertLayoutBinding.descriptorCount = 1;
@@ -945,33 +881,18 @@ private:
     }
 
 
-    skyboxModel.descriptorSetLayout = descriptorSetLayout;
-    skyboxModel.createDescriptorBuffers();
-    
+    skybox.model->descriptorSetLayout = descriptorSetLayout;
+    skybox.model->createDescriptorBuffers();
+    }
 
-    auto pipeline = new Pipeline;
-    pipeline->device = &device;
-    pipeline->descriptorSetLayout = descriptorSetLayout;
-    pipeline->swapChainExtent = swapChainExtent;
-    pipeline->renderPass = renderPass;
-    pipeline->pushConstantSize = sizeof(UniformBufferObject);
-    pipeline->msaaSamples = msaaSamples;
-    pipeline->createGraphicsPipeline("shaders/skybox_vert.spv", "shaders/skybox_frag.spv");
-    //pipeline->createGraphicsPipeline("shaders/equi_vert.spv", "shaders/equi_frag.spv");
-    ////create the models
-    //std::string mpath = "models/cube.obj";
-    //std::cout << mpath << std::endl;
-    //auto model = new Model();
-    //model->device = &device;
-    //model->swapChainSize = swapChainImages.size();
-    //model->descriptorPool = descriptorPool;
-    //model->loadModel(mpath);
-    ////model->createDescriptorSetLayout();
-    //model->descriptorSetLayout = descriptorSetLayout;
-    //model->createDescriptorBuffers();
-    //model->createMaterialBuffers();
-    ////model->createDescriptorSets();
-    ////#######TEMP STUFF################
+    //auto pipeline = new Pipeline;
+    skybox.pipeline.device = &device;
+    skybox.pipeline.descriptorSetLayout = descriptorSetLayout;
+    skybox.pipeline.swapChainExtent = swapChainExtent;
+    skybox.pipeline.renderPass = renderPass;
+    skybox.pipeline.pushConstantSize = sizeof(UniformBufferObject);
+    skybox.pipeline.msaaSamples = msaaSamples;
+    skybox.pipeline.createGraphicsPipeline("shaders/skybox_vert.spv", "shaders/skybox_frag.spv");
     std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -979,26 +900,26 @@ private:
     allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
     allocInfo.pSetLayouts = layouts.data();
 
-    skyboxModel.descriptorSets.resize(swapChainImages.size());
-    if (vkAllocateDescriptorSets(device.device, &allocInfo, skyboxModel.descriptorSets.data()) != VK_SUCCESS) {
+    skybox.model->descriptorSets.resize(swapChainImages.size());
+    if (vkAllocateDescriptorSets(device.device, &allocInfo, skybox.model->descriptorSets.data()) != VK_SUCCESS) {
       throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
     for (size_t i = 0; i < swapChainImages.size(); i++) {
       VkDescriptorBufferInfo bufferInfo{};
-      bufferInfo.buffer = skyboxModel.descriptorBuffer[i];
+      bufferInfo.buffer = skybox.model->descriptorBuffer[i];
       bufferInfo.offset = 0;
       bufferInfo.range = sizeof(glm::mat4);
 
       VkDescriptorImageInfo imageInfo{};
       imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      imageInfo.imageView = sTex.view;
-      imageInfo.sampler = sTex.sampler;
+      imageInfo.imageView = skybox.texture.view;
+      imageInfo.sampler = skybox.texture.sampler;
 
       std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
       descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[0].dstSet = skyboxModel.descriptorSets[i];
+      descriptorWrites[0].dstSet = skybox.model->descriptorSets[i];
       descriptorWrites[0].dstBinding = 0;
       descriptorWrites[0].dstArrayElement = 0;
       descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1006,7 +927,7 @@ private:
       descriptorWrites[0].pBufferInfo = &bufferInfo;
 
       descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[1].dstSet = skyboxModel.descriptorSets[i];
+      descriptorWrites[1].dstSet = skybox.model->descriptorSets[i];
       descriptorWrites[1].dstBinding = 1;
       descriptorWrites[1].dstArrayElement = 0;
       descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1015,11 +936,6 @@ private:
 
       vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
-    pipeline->models.push_back(&skyboxModel);
-    
-    //models.push_back(&skyboxModel);
-
-    pipelines.push_back(pipeline);
   }
 
   void setupLights() {
@@ -1326,11 +1242,6 @@ private:
     }
   }
 
-  void createImageViews2() {
-    swapChainImageViews2.resize(1);
-    swapChainImageViews2[0] = createImageView(swapChainImages2[0], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-  }
-
   VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1474,7 +1385,7 @@ private:
         for(auto pipeline:pipelines){
 
           vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->graphicsPipeline);
-
+          
           for(auto model: pipeline->models){
 
             VkBuffer vertexBuffers[] = { model->vertexBuffer };
@@ -1491,6 +1402,19 @@ private:
 
           }
         }
+        
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, skybox.pipeline.graphicsPipeline);
+        
+        VkBuffer vertexBuffers[] = { skybox.model->vertexBuffer };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+        vkCmdBindIndexBuffer(commandBuffers[i], skybox.model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, skybox.pipeline.pipelineLayout, 0, 1, &skybox.model->descriptorSets[i], 0, nullptr);
+
+        vkCmdDrawIndexed(commandBuffers[i], skybox.model->indices, 1, 0, 0, 0);
+
         vkCmdEndRenderPass(commandBuffers[i]);
 
         if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -1672,9 +1596,9 @@ private:
     if(models[currentModel]->materials.size() > 0)
       models[currentModel]->updateMaterialBuffer(imageIndex);
     
-    skyboxModel.modelPos = pushConstants[imageIndex].view;
-    skyboxModel.modelPos[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    skyboxModel.updateDescriptors(imageIndex);
+    skybox.model->modelPos = pushConstants[imageIndex].view;
+    skybox.model->modelPos[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    skybox.model->updateDescriptors(imageIndex);
 
 
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
