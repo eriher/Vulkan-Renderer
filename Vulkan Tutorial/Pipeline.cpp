@@ -65,7 +65,7 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   if(vertFilePath.find("skybox") != vertFilePath.npos || vertFilePath.find("equi") != vertFilePath.npos)
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
   else
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -166,10 +166,10 @@ void Pipeline::createDescriptorSetLayout() {
 
 void Pipeline::cleanup()
 {
-  for (auto& model : models){
-    model->cleanup();
-    delete model;
-  }
+  //for (auto& model : models){
+  //  model->cleanup();
+  //  delete model;
+  //}
   vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
   vkDestroyPipeline(device->device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);

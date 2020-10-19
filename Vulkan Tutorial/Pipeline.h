@@ -3,7 +3,7 @@
 #include <vector>
 #include <fstream>
 #include "Device.h"
-#include "Model.h"
+//#include "Model.h"
 class Pipeline
 {
 
@@ -20,7 +20,7 @@ public:
 	VkPipeline graphicsPipeline;
 	VkPipelineLayout pipelineLayout; 
 
-  std::vector<Model*> models;
+  //std::vector<Model*> models;
 
 	void createGraphicsPipeline(std::string, std::string);
   void createDescriptorSetLayout();

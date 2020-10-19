@@ -174,11 +174,16 @@ void Model::loadModel(std::string modelPath) {
 
 }
 
-void Model::updateDescriptors(uint32_t idx) {
+void Model::updateDescriptor(uint32_t idx) {
 	  void* data;
 	  vkMapMemory(device->device, descriptorMemory[idx], 0, sizeof(modelPos), 0, &data);
 	  memcpy(data, &modelPos, sizeof(modelPos));
 	  vkUnmapMemory(device->device, descriptorMemory[idx]);
+}
+
+void Model::updateDescriptors() {
+	for (auto i = 0; i < swapChainSize; i++)
+		updateDescriptor(i);
 }
 
 void Model::updateModelpos(int keyFlags, float delta) {
@@ -275,7 +280,7 @@ void Model::createDescriptorBuffers() {
 	descriptorMemory.resize(swapChainSize);
 	for (size_t i = 0; i < swapChainSize; i++) {
 		device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, descriptorBuffer[i], descriptorMemory[i]);
-		updateDescriptors(i);
+		updateDescriptor(i);
 	}
 }
 

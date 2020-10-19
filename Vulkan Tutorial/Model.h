@@ -77,7 +77,8 @@ public:
 
 	void loadModel(std::string modelPath);
 	void loadModel(std::string modelPath, std::string texturePath);
-	void updateDescriptors(uint32_t idx);
+	void updateDescriptors();
+	void updateDescriptor(uint32_t idx);
 	void updateModelpos(int keyFlags, float delta);
 	void createDescriptorSetLayout();
 	void createDescriptorSets();

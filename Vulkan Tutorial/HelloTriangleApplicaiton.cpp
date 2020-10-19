@@ -29,7 +29,7 @@
 #include <set>
 #include <unordered_map>
 #include <memory>
-//#include "Model.h"
+#include "Model.h"
 #include "Pipeline.h"
 #include "SkyboxTexture.h"
 #include "HdrTexture.h"
@@ -39,7 +39,7 @@ const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
 const std::array<std::pair<std::string, std::string>, 2> MODEL_PATH = { std::make_pair("models/craneo.obj","textures/difuso_flip_oscuro.jpg"),
-std::make_pair("models/cube.obj","textures/texture.jpg") };
+std::make_pair("models/quad.obj","textures/texture.jpg") };
 const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/sphere.obj" };
 
 //const std::array<std::string, 1> MODEL_PATH = { "models/craneo.obj"};
@@ -185,7 +185,10 @@ private:
   bool cameraView = true;
 
   int currentModel = 0;
-  std::vector<Model*> models;
+  //Model selectedModel;
+  Model* selectedModel;
+  //std::vector<Model*> models;
+
 
   LightSource light;
   std::vector<VkBuffer> lightBuffer;
@@ -201,6 +204,15 @@ private:
     Pipeline pipeline;
   } skybox;
 
+  struct {
+    std::vector<Model> models;
+    Pipeline pipeline;
+  } pbr;
+
+  struct {
+    std::vector<Model> models;
+    Pipeline pipeline;
+  } trad;
 
   int zcounter = 1;
 
@@ -316,6 +328,8 @@ private:
       if (action == GLFW_RELEASE)
         app->keyFlags &= ~8;
     }
+    if (!app->selectedModel)
+      return;
     if (key == GLFW_KEY_UP) {
       if (action == GLFW_PRESS)
         app->keyFlags |= 16;
@@ -517,8 +531,6 @@ private:
 
   void mainLoop() {
     lastFrame = glfwGetTime();
-    for (auto& model : models)
-      std::cout << model->name << std::endl;
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
       drawFrame();
@@ -575,14 +587,22 @@ private:
   void cleanup() {
     cleanupSwapChain();
 
-    for (auto& pipeline : pipelines) {
-      pipeline->cleanup();
-    }
+    //for (auto& pipeline : pipelines) {
+    //  pipeline->cleanup();
+    //}
 
     skybox.texture.cleanup();
     skybox.model->cleanup();
-    delete skybox.model;
     skybox.pipeline.cleanup();
+
+    for (auto& m : pbr.models)
+      m.cleanup();
+    pbr.pipeline.cleanup();
+
+    for (auto& m : trad.models)
+      m.cleanup();
+    trad.pipeline.cleanup();
+
 
     for (auto i = 0; i < lightBuffer.size(); i++) {
       vkDestroyBuffer(device.device, lightBuffer[i], nullptr);
@@ -842,7 +862,6 @@ private:
     }
   }
 
-
   void createSkybox() {
     skybox.model = new Model;
     skybox.model->device = &device;
@@ -984,40 +1003,32 @@ private:
         throw std::runtime_error("failed to create descriptor set layout!");
       }
       //create the pipeline
-      auto pipeline = new Pipeline;
-      pipeline->device = &device;
-      pipeline->descriptorSetLayout = descriptorSetLayout;
-      pipeline->swapChainExtent = swapChainExtent;
-      pipeline->renderPass = renderPass;
-      pipeline->pushConstantSize = sizeof(UniformBufferObject);
-      pipeline->msaaSamples = msaaSamples;
-      pipeline->createGraphicsPipeline("shaders/vert.spv", "shaders/frag.spv");
+      //auto pipeline = new Pipeline;
+      
+      trad.pipeline.device = &device;
+      trad.pipeline.descriptorSetLayout = descriptorSetLayout;
+      trad.pipeline.swapChainExtent = swapChainExtent;
+      trad.pipeline.renderPass = renderPass;
+      trad.pipeline.pushConstantSize = sizeof(UniformBufferObject);
+      trad.pipeline.msaaSamples = msaaSamples;
+      trad.pipeline.createGraphicsPipeline("shaders/vert.spv", "shaders/frag.spv");
       //create the models
       int tmpMult = 0;
       for (auto& pair : MODEL_PATH) {
         std::cout << pair.first << std::endl;
-        auto model = new Model();
-        model->device = &device;
-        model->swapChainSize = swapChainImages.size();
-        if(tmpMult == 0)
-          model->loadModel(pair.first, pair.second);
-        else{
-          //model->textures.push_back(offscreenTexture);
-          //model->loadModel("models/quad.obj");
-          model->loadModel("models/quad.obj", "textures/texture.jpg");
-        }
-        model->modelPos[3][0] = tmpMult*3.0f;
-        //model->createDescriptorSetLayout();
-        model->descriptorSetLayout = descriptorSetLayout;
-        model->createDescriptorBuffers();
-        model->createDescriptorSets();
-        pipeline->models.push_back(model);
-        models.push_back(model);
+        Model m;
+        m.device = &device;
+        m.swapChainSize = swapChainImages.size();
+        m.loadModel(pair.first, pair.second);
+        m.modelPos[3][0] = tmpMult*3.0f;
+        m.descriptorSetLayout = descriptorSetLayout;
+        m.createDescriptorBuffers();
+        m.createDescriptorSets();
+        trad.models.push_back(m);
         tmpMult++;
       }
-
-      pipelines.push_back(pipeline);
     }
+
     ////MATERIAL MODELS
     {
       VkDescriptorSetLayout descriptorSetLayout;
@@ -1051,29 +1062,25 @@ private:
       if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
       }
-
-      auto pipeline = new Pipeline;
-      pipeline->device = &device;
-      pipeline->descriptorSetLayout = descriptorSetLayout;
-      pipeline->swapChainExtent = swapChainExtent;
-      pipeline->renderPass = renderPass;
-      pipeline->pushConstantSize = sizeof(UniformBufferObject);
-      pipeline->msaaSamples = msaaSamples;
-      pipeline->createGraphicsPipeline("shaders/pbr_vert.spv", "shaders/pbr_frag.spv");
+      pbr.pipeline.device = &device;
+      pbr.pipeline.descriptorSetLayout = descriptorSetLayout;
+      pbr.pipeline.swapChainExtent = swapChainExtent;
+      pbr.pipeline.renderPass = renderPass;
+      pbr.pipeline.pushConstantSize = sizeof(UniformBufferObject);
+      pbr.pipeline.msaaSamples = msaaSamples;
+      pbr.pipeline.createGraphicsPipeline("shaders/pbr_vert.spv", "shaders/pbr_frag.spv");
       //create the models
       for (auto& mpath : MATERIAL_MODEL_PATH) {
         std::cout << mpath << std::endl;
-        auto model = new Model();
-        model->device = &device;
-        model->swapChainSize = swapChainImages.size();
-        model->loadModel(mpath);
-        model->modelPos[3][0] = -3.0f;
-        //model->createDescriptorSetLayout();
-        model->descriptorSetLayout = descriptorSetLayout;
-        model->createDescriptorBuffers();
-        model->createMaterialBuffers();
-        //model->createDescriptorSets();
-        //#######TEMP STUFF################
+        Model m;
+        m.device = &device;
+        m.swapChainSize = swapChainImages.size();
+        m.loadModel(mpath);
+        m.modelPos[3][0] = -3.0f;        
+        m.descriptorSetLayout = descriptorSetLayout;
+        m.createDescriptorBuffers();
+        m.createMaterialBuffers();
+
         std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1081,19 +1088,19 @@ private:
         allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
         allocInfo.pSetLayouts = layouts.data();
 
-        model->descriptorSets.resize(swapChainImages.size());
-        if (vkAllocateDescriptorSets(device.device, &allocInfo, model->descriptorSets.data()) != VK_SUCCESS) {
+        m.descriptorSets.resize(swapChainImages.size());
+        if (vkAllocateDescriptorSets(device.device, &allocInfo, m.descriptorSets.data()) != VK_SUCCESS) {
           throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
         for (size_t i = 0; i < swapChainImages.size(); i++) {
           VkDescriptorBufferInfo bufferInfo{};
-          bufferInfo.buffer = model->descriptorBuffer[i];
+          bufferInfo.buffer = m.descriptorBuffer[i];
           bufferInfo.offset = 0;
           bufferInfo.range = sizeof(glm::mat4);
 
           VkDescriptorBufferInfo bufferInfo2{};
-          bufferInfo2.buffer = model->materialBuffer[i];
+          bufferInfo2.buffer = m.materialBuffer[i];
           bufferInfo2.offset = 0;
           bufferInfo2.range = sizeof(MaterialProperties);
 
@@ -1105,7 +1112,7 @@ private:
           std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
           descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-          descriptorWrites[0].dstSet = model->descriptorSets[i];
+          descriptorWrites[0].dstSet = m.descriptorSets[i];
           descriptorWrites[0].dstBinding = 0;
           descriptorWrites[0].dstArrayElement = 0;
           descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1113,7 +1120,7 @@ private:
           descriptorWrites[0].pBufferInfo = &bufferInfo;
 
           descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-          descriptorWrites[1].dstSet = model->descriptorSets[i];
+          descriptorWrites[1].dstSet = m.descriptorSets[i];
           descriptorWrites[1].dstBinding = 1;
           descriptorWrites[1].dstArrayElement = 0;
           descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1121,7 +1128,7 @@ private:
           descriptorWrites[1].pBufferInfo = &bufferInfo2;
 
           descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-          descriptorWrites[2].dstSet = model->descriptorSets[i];
+          descriptorWrites[2].dstSet = m.descriptorSets[i];
           descriptorWrites[2].dstBinding = 2;
           descriptorWrites[2].dstArrayElement = 0;
           descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1130,19 +1137,9 @@ private:
 
           vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
-        pipeline->models.push_back(model);
-        models.push_back(model);
+        pbr.models.push_back(m);
       }
-
-      pipelines.push_back(pipeline);
     }
-    //pbr models
-    //create descriptorsetlayout
-    //create the pipeline
-    //create the models
-    //"shaders/pbr_vert.spv"
-    //"shaders/pbr_frag.spv"
-
 
   }
 
@@ -1378,29 +1375,40 @@ private:
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
+        //The Traditional models
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        //std::cout << pipelines.size() << std::endl;
-
-        for(auto pipeline:pipelines){
-
-          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->graphicsPipeline);
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.graphicsPipeline);
           
-          for(auto model: pipeline->models){
+        for(auto& model: trad.models){
 
-            VkBuffer vertexBuffers[] = { model->vertexBuffer };
-            VkDeviceSize offsets[] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+          VkBuffer vertexBuffers[] = { model.vertexBuffer };
+          VkDeviceSize offsets[] = { 0 };
+          vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+          vkCmdBindIndexBuffer(commandBuffers[i], model.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 0, 1, &model.descriptorSets[i], 0, nullptr);
 
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout, 0, 1, &model->descriptorSets[i], 0, nullptr);
+          vkCmdDrawIndexed(commandBuffers[i], model.indices, 1, 0, 0, 0);
 
-            vkCmdDrawIndexed(commandBuffers[i], model->indices, 1, 0, 0, 0);
+        }
 
-          }
+        //The PBR models
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.graphicsPipeline);
+
+        for (auto& model : pbr.models) {
+
+          VkBuffer vertexBuffers[] = { model.vertexBuffer };
+          VkDeviceSize offsets[] = { 0 };
+          vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+          vkCmdBindIndexBuffer(commandBuffers[i], model.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 0, 1, &model.descriptorSets[i], 0, nullptr);
+
+          vkCmdDrawIndexed(commandBuffers[i], model.indices, 1, 0, 0, 0);
+
         }
         
         vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, skybox.pipeline.graphicsPipeline);
@@ -1540,9 +1548,9 @@ private:
         float newY = -std::sin(glm::radians(yoffset));
         float newZ = -std::cos(glm::radians(yoffset));
         if (mouseFlags & 2) {
-          models[currentModel]->modelPos = glm::rotate(models[currentModel]->modelPos, glm::radians(xoffset), glm::vec3(0.0f, -1.0f, 0.0f));
+          selectedModel->modelPos = glm::rotate(selectedModel->modelPos, glm::radians(xoffset), glm::vec3(0.0f, -1.0f, 0.0f));
           if (mouseFlags & 1)
-            models[currentModel]->modelPos = glm::translate(models[currentModel]->modelPos, glm::vec3(0.0f, 0.0f, 2.0f * 5.0f * deltaFrame));
+            selectedModel->modelPos = glm::translate(selectedModel->modelPos, glm::vec3(0.0f, 0.0f, 2.0f * 5.0f * deltaFrame));
           cameraX = 0.0f;
           xoffset = local_xOffset;
 
@@ -1565,9 +1573,9 @@ private:
 
       glm::vec4 pos(cameraRadius*cameraX, cameraRadius*cameraY, cameraRadius*cameraZ, 1.0f);
 
-      pos = models[currentModel]->modelPos * pos;
+      pos = selectedModel->modelPos * pos;
       glm::vec4 front(0.0f,0.0f,0.1f,1.0f);
-      front = models[currentModel]->modelPos * front;
+      front = selectedModel->modelPos * front;
       pushConstants[imageIndex].view = glm::lookAt(glm::vec3(pos), glm::vec3(front), cameraUp);
 
     }
@@ -1589,16 +1597,19 @@ private:
 
     //updateUniformBuffer(imageIndex);
     
-    
-    models[currentModel]->updateModelpos(keyFlags, deltaFrame);
-    models[currentModel]->updateDescriptors(imageIndex);
+    if(keyFlags >= 16){
+      //models[currentModel]->updateModelpos(keyFlags, deltaFrame);
+      //models[currentModel]->updateDescriptors(imageIndex);
+      selectedModel->updateModelpos(keyFlags, deltaFrame);
+      selectedModel->updateDescriptors();
+    }
     updatePushConstant(imageIndex);
-    if(models[currentModel]->materials.size() > 0)
-      models[currentModel]->updateMaterialBuffer(imageIndex);
+    //if(models[currentModel]->materials.size() > 0)
+    //  models[currentModel]->updateMaterialBuffer(imageIndex);
     
     skybox.model->modelPos = pushConstants[imageIndex].view;
     skybox.model->modelPos[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    skybox.model->updateDescriptors(imageIndex);
+    skybox.model->updateDescriptors();
 
 
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
@@ -1617,10 +1628,12 @@ private:
     }
 
     //VkCommandBuffer pcBuffer = device.beginSingleTimeCommands();
-    for(auto pipeline:pipelines)
-      vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstants[imageIndex]);
+    //for(auto pipeline:pipelines)
+    //  vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstants[imageIndex]);
     //device.endSingleTimeCommands(pcBuffer);
-
+    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], trad.pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstants[imageIndex]);
+    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], pbr.pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstants[imageIndex]);
+    
     if (vkEndCommandBuffer(pushConstantCommandBuffers[imageIndex]) != VK_SUCCESS) {
       throw std::runtime_error("failed to end imgui command buffer!");
     }
@@ -1675,14 +1688,39 @@ private:
           ImGui::Text("real radius: %.3f", r);
         }
 
+
+        //ImGui::Text("Model Select");
+        //if (ImGui::BeginCombo("##combo", models[currentModel]->name.c_str())) // The second parameter is the label previewed before opening the combo.
+        //{
+        //  for (int n = 0; n < models.size(); n++)
+        //  {
+        //    bool is_selected = (n == currentModel); // You can store your selection however you want, outside or inside your objects
+        //    if (ImGui::Selectable(models[n]->name.c_str(), is_selected))
+        //      currentModel = n;
+        //    if (is_selected)
+        //      ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+        //  }
+        //  ImGui::EndCombo();
+        //}
+
         ImGui::Text("Model Select");
-        if (ImGui::BeginCombo("##combo", models[currentModel]->name.c_str())) // The second parameter is the label previewed before opening the combo.
+        if (ImGui::BeginCombo("##combo", selectedModel ? selectedModel->name.c_str(): "select a model")) // The second parameter is the label previewed before opening the combo.
         {
-          for (int n = 0; n < models.size(); n++)
+          ImGui::Text("-TRAD Models-");
+          for (auto& m: trad.models)
           {
-            bool is_selected = (n == currentModel); // You can store your selection however you want, outside or inside your objects
-            if (ImGui::Selectable(models[n]->name.c_str(), is_selected))
-              currentModel = n;
+            bool is_selected = (&m == selectedModel); // You can store your selection however you want, outside or inside your objects
+            if (ImGui::Selectable(m.name.c_str(), is_selected))
+              selectedModel = &m;
+            if (is_selected)
+              ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+          }
+          ImGui::Text("-PBR Models-");
+          for (auto& m : pbr.models)
+          {
+            bool is_selected = (&m == selectedModel); // You can store your selection however you want, outside or inside your objects
+            if (ImGui::Selectable(m.name.c_str(), is_selected))
+              selectedModel = &m;
             if (is_selected)
               ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
           }
@@ -1690,15 +1728,15 @@ private:
         }
 
 
-        if (models[currentModel]->materials.size() > 0) {
-          ImGui::Text("Material Name %s", models[currentModel]->materials[0].m_name.c_str());
-          ImGui::ColorEdit3("Color", &models[currentModel]->materials[0].properties.m_color.x);
-          ImGui::SliderFloat("Reflectivity", &models[currentModel]->materials[0].properties.m_reflectivity, 0.0f, 1.0f);
-          ImGui::SliderFloat("Metalness", &models[currentModel]->materials[0].properties.m_metalness, 0.0f, 1.0f);
-          ImGui::SliderFloat("Fresnel", &models[currentModel]->materials[0].properties.m_fresnel, 0.0f, 1.0f);
-          ImGui::SliderFloat("shininess", &models[currentModel]->materials[0].properties.m_shininess, 0.0f, 25000.0f);
-          ImGui::SliderFloat("Emission", &models[currentModel]->materials[0].properties.m_emission, 0.0f, 1.0f);
-        }
+        //if (models[currentModel]->materials.size() > 0) {
+        //  ImGui::Text("Material Name %s", models[currentModel]->materials[0].m_name.c_str());
+        //  ImGui::ColorEdit3("Color", &models[currentModel]->materials[0].properties.m_color.x);
+        //  ImGui::SliderFloat("Reflectivity", &models[currentModel]->materials[0].properties.m_reflectivity, 0.0f, 1.0f);
+        //  ImGui::SliderFloat("Metalness", &models[currentModel]->materials[0].properties.m_metalness, 0.0f, 1.0f);
+        //  ImGui::SliderFloat("Fresnel", &models[currentModel]->materials[0].properties.m_fresnel, 0.0f, 1.0f);
+        //  ImGui::SliderFloat("shininess", &models[currentModel]->materials[0].properties.m_shininess, 0.0f, 25000.0f);
+        //  ImGui::SliderFloat("Emission", &models[currentModel]->materials[0].properties.m_emission, 0.0f, 1.0f);
+        //}
 
         //if (ImGui::Button("Reload Shaders")) {
         //  models[currentModel]->updateMaterialBuffer(imageIndex);
