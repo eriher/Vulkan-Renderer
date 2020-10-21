@@ -53,6 +53,7 @@
     <ResourceCompile Include="Vulkan Tutorial.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\irradiancemap.frag" />
     <None Include="shaders\pbr_shader.frag" />
     <None Include="shaders\pbr_shader.vert" />
   </ItemGroup>

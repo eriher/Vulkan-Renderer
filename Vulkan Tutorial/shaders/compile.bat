@@ -8,3 +8,4 @@ C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.vert -o equi_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.frag -o equi_frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.vert -o cubemap_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.frag -o cubemap_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe irradiancemap.frag -o irradiancemap.spv

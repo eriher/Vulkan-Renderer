@@ -216,6 +216,8 @@ private:
 
   int zcounter = 1;
 
+  Texture testTexture;
+
   void initWindow() {
     glfwInit();
 
@@ -869,7 +871,8 @@ private:
     skybox.model->loadModel("skybox/cube.obj");
     //SkyboxTexture sTex;
     skybox.texture.device = &device;
-    skybox.texture.loadHdr("envmaps/001.hdr",2048, skybox.model);
+    skybox.texture.loadHdr("envmaps/001.hdr", 2048, skybox.model);
+    //skybox.texture.loadHdr("envmaps/Alexs_Apt_2k.hdr", 2048, skybox.model);
     //sTex.load("envmaps/001.hdr");
 
 
@@ -932,7 +935,8 @@ private:
 
       VkDescriptorImageInfo imageInfo{};
       imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      imageInfo.imageView = skybox.texture.view;
+      imageInfo.imageView = skybox.texture.skyboxView;
+      //imageInfo.imageView = skybox.texture.irradianceView;
       imageInfo.sampler = skybox.texture.sampler;
 
       std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
@@ -1027,6 +1031,19 @@ private:
         trad.models.push_back(m);
         tmpMult++;
       }
+      testTexture.device = &device;
+      testTexture.load("envmaps/001_irradiance.hdr");
+    
+      Model m;
+      m.device = &device;
+      m.swapChainSize = swapChainImages.size();
+      m.loadModel("models/quad.obj");
+      m.textures.push_back(testTexture);
+      m.modelPos[3][0] = tmpMult * 3.0f;
+      m.descriptorSetLayout = descriptorSetLayout;
+      m.createDescriptorBuffers();
+      m.createDescriptorSets();
+      trad.models.push_back(m);
     }
 
     ////MATERIAL MODELS
