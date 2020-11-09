@@ -4,7 +4,7 @@
 #include <vector>
 #include "vulkan/vulkan.h"
 #define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+//#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtc/matrix_transform.hpp>
 #include "tiny_obj_loader.h"
 #include <unordered_map>
@@ -22,23 +22,29 @@ struct MaterialProperties {
 
 struct Material
 {
-	std::string m_name;
+	std::string name;
 	MaterialProperties properties;
-	Texture m_color_texture;
-	Texture	m_reflectivity_texture;
-	Texture	m_shininess_texture;
-	Texture	m_metalness_texture;
-	Texture	m_fresnel_texture;
-	Texture	m_emission_texture;
+	Texture color_texture;
+	Texture	reflectivity_texture;
+	Texture	shininess_texture;
+	Texture	metalness_texture;
+	Texture	fresnel_texture;
+	Texture	emission_texture;
+
+	std::vector<VkBuffer> buffer;
+	std::vector<VkDeviceMemory> memory;
+
+	std::vector<VkDescriptorSet> descriptorSets;
 };
 
 struct Mesh
 {
-	std::string m_name;
-	uint32_t m_material_idx;
+	std::string name;
+	uint32_t material;
+	uint32_t texture;
 	// Where this Mesh's vertices start
-	uint32_t m_start_index;
-	uint32_t m_number_of_vertices;
+	uint32_t start_index;
+	uint32_t indices;
 };
 
 class Model {
@@ -54,6 +60,8 @@ public:
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
 
+	std::vector<Mesh> meshes;
+
 	std::vector<Texture> textures;
 	std::vector<Material> materials;
 
@@ -62,11 +70,10 @@ public:
 	VkDescriptorSetLayout descriptorSetLayout;
 	std::vector<VkDescriptorSet> descriptorSets;
 
+	VkDescriptorSetLayout materialDescriptorSetLayout;
+
 	std::vector<VkBuffer> descriptorBuffer;
 	std::vector<VkDeviceMemory> descriptorMemory;
-
-	std::vector<VkBuffer> materialBuffer;
-	std::vector<VkDeviceMemory> materialMemory;
 
 	glm::mat4 modelPos = glm::mat4(1.0f);
 	float yaw = -90;
@@ -83,7 +90,8 @@ public:
 	void createDescriptorSetLayout();
 	void createDescriptorSets();
 	void createDescriptorBuffers();
-	void updateMaterialBuffer(uint32_t idx);
+	void updateMaterial(Material &mat);
+	void createMaterialDescriptorSetLayout();
 	void createMaterialBuffers();
 	void cleanup();
 };

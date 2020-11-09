@@ -9,16 +9,18 @@ void HdrTexture::cleanup() {
 }
 
 void HdrTexture::load(const std::string& fpath) {
-
-  stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+  std::cout << "is hdr? " <<  stbi_is_hdr(fpath.c_str()) << std::endl;;
+  float* pixels = stbi_loadf(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+  //stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
   VkDeviceSize imageSize = texWidth * texHeight * 4;
+  imageSize *= 4;
   //mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
   mipLevels = 1;
-
+  //createImage();
   if (!pixels) {
     throw std::runtime_error("failed to load texture image!");
   }
-
+  //imageSize = testSize;
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
@@ -32,16 +34,16 @@ void HdrTexture::load(const std::string& fpath) {
 
   createImage();
 
-  transitionImageLayout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+  transitionImageLayout(image, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
   copyBufferToImage(stagingBuffer);
   //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
-  transitionImageLayout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mipLevels);
+  transitionImageLayout(image, imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mipLevels);
   vkDestroyBuffer(device->device, stagingBuffer, nullptr);
   vkFreeMemory(device->device, stagingBufferMemory, nullptr);
 
   //generateMipmaps(image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
 
-  createImageView(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+  createImageView(image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
   createTextureSampler();
 
 }
@@ -57,7 +59,8 @@ void HdrTexture::createImage()
   imageInfo.mipLevels = mipLevels;
   imageInfo.arrayLayers = 1;
   //imageInfo.arrayLayers = 6;
-  imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+  imageInfo.format = imageFormat;
+  //imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
   imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -71,7 +74,7 @@ void HdrTexture::createImage()
 
   VkMemoryRequirements memRequirements;
   vkGetImageMemoryRequirements(device->device, image, &memRequirements);
-
+  testSize = memRequirements.size;
   VkMemoryAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = memRequirements.size;

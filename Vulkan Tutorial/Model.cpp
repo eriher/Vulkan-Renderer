@@ -24,9 +24,11 @@ void Model::cleanup() {
 		vkFreeMemory(device->device, descriptorMemory[i], nullptr);
 	}
 
-	for (auto i = 0; i < materialBuffer.size(); i++) {
-		vkDestroyBuffer(device->device, materialBuffer[i], nullptr);
-		vkFreeMemory(device->device, materialMemory[i], nullptr);
+	for (auto i = 0; i < materials.size(); i++) {
+		for(int j = 0; j < swapChainSize; j++){
+			vkDestroyBuffer(device->device, materials[i].buffer[j], nullptr);
+			vkFreeMemory(device->device, materials[i].memory[j], nullptr);
+		}
 	}
 
 	//vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
@@ -37,6 +39,7 @@ void Model::loadModel(std::string modelPath, std::string texturePath) {
 	texture.device = device;
 	texture.load(texturePath);
 	textures.push_back(texture);
+
 	loadModel(modelPath);
 }
 
@@ -55,11 +58,12 @@ void Model::loadModel(std::string modelPath) {
 
 	for (const auto& m : mats) {
 		Material material;
-		material.m_name = m.name;
+		material.name = m.name;
 		material.properties.m_color = glm::vec4(m.diffuse[0], m.diffuse[1], m.diffuse[2], 1.0f);
-		//if (m.diffuse_texname != "") {
-		//	material.m_color_texture.load(directory + m.diffuse_texname, 4);
-		//}
+		if (m.diffuse_texname != "") {
+			material.color_texture.device = device;
+			material.color_texture.load(matPath + "/" + m.diffuse_texname);
+		}
 
 		material.properties.m_reflectivity = m.specular[0];
 		//if (m.specular_texname != "") {
@@ -130,6 +134,11 @@ void Model::loadModel(std::string modelPath) {
 
 
 	for (const auto& shape : shapes) {
+		Mesh mesh;
+		mesh.texture = 0;
+		mesh.start_index = indices;
+		mesh.material = shape.mesh.material_ids[0];
+		mesh.name = shape.name;
 		for (const auto& index : shape.mesh.indices) {
 			Vertex vertex{};
 
@@ -164,13 +173,15 @@ void Model::loadModel(std::string modelPath) {
 			}
 
 			modelIndices.push_back(uniqueVertices[vertex]);
+			indices++;
 		}
+		mesh.indices = indices - mesh.start_index;
+		meshes.push_back(mesh);
 	}
-	indices = static_cast<uint32_t>(modelIndices.size());
+	//indices = static_cast<uint32_t>(modelIndices.size());
 
 	device->createStagedBuffer(modelVertices, vertexBuffer, vertexBufferMemory, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	device->createStagedBuffer(modelIndices, indexBuffer, indexBufferMemory, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
 
 }
 
@@ -216,17 +227,13 @@ void Model::createDescriptorSets() {
 	}
 
 	for (size_t i = 0; i < swapChainSize; i++) {
+
+		std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+
 		VkDescriptorBufferInfo bufferInfo{};
 		bufferInfo.buffer = descriptorBuffer[i];
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(glm::mat4);
-
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = textures[0].view;
-		imageInfo.sampler = textures[0].sampler;
-
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
 		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		descriptorWrites[0].dstSet = descriptorSets[i];
@@ -236,13 +243,19 @@ void Model::createDescriptorSets() {
 		descriptorWrites[0].descriptorCount = 1;
 		descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = descriptorSets[i];
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pImageInfo = &imageInfo;
+		//VkDescriptorImageInfo imageInfo{};
+		//imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		//imageInfo.imageView = textures[0].view;
+		//imageInfo.sampler = textures[0].sampler;
+
+		//descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		//descriptorWrites[1].dstSet = descriptorSets[i];
+		//descriptorWrites[1].dstBinding = 1;
+		//descriptorWrites[1].dstArrayElement = 0;
+		//descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//descriptorWrites[1].descriptorCount = 1;
+		//descriptorWrites[1].pImageInfo = &imageInfo;
+
 
 		vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 	}
@@ -256,14 +269,14 @@ void Model::createDescriptorSetLayout() {
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-		VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-		samplerLayoutBinding.binding = 1;
-		samplerLayoutBinding.descriptorCount = 1;
-		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		samplerLayoutBinding.pImmutableSamplers = nullptr;
-		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		//VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+		//samplerLayoutBinding.binding = 1;
+		//samplerLayoutBinding.descriptorCount = 1;
+		//samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//samplerLayoutBinding.pImmutableSamplers = nullptr;
+		//samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+		std::array<VkDescriptorSetLayoutBinding, 1> bindings = { uboLayoutBinding/*, samplerLayoutBinding */};
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -285,19 +298,99 @@ void Model::createDescriptorBuffers() {
 }
 
 void Model::createMaterialBuffers() {
+
+	std::vector<VkDescriptorSetLayout> layouts(swapChainSize, materialDescriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = device->descriptorPool;
+	allocInfo.descriptorSetCount = swapChainSize;
+	allocInfo.pSetLayouts = layouts.data();
+
 	VkDeviceSize bufferSize = sizeof(MaterialProperties);
-	materialBuffer.resize(swapChainSize);
-	materialMemory.resize(swapChainSize);
-	for (size_t i = 0; i < swapChainSize; i++) {
-		device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, materialBuffer[i], materialMemory[i]);
-		updateMaterialBuffer(i);
+	for (auto& mat : materials) {
+
+		mat.buffer.resize(swapChainSize);
+		mat.memory.resize(swapChainSize);
+		
+		for (size_t i = 0; i < swapChainSize; i++) {
+			device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mat.buffer[i], mat.memory[i]);
+		}
+		
+		updateMaterial(mat);
+		
+		mat.descriptorSets.resize(swapChainSize);
+		
+		if (vkAllocateDescriptorSets(device->device, &allocInfo, mat.descriptorSets.data()) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate descriptor sets!");
+		}
+
+		for (size_t i = 0; i < swapChainSize; i++) {
+			//VkDescriptorBufferInfo bufferInfo{};
+			//bufferInfo.buffer = mat.buffer[i];
+			//bufferInfo.offset = 0;
+			//bufferInfo.range = sizeof(MaterialProperties);
+
+			//VkWriteDescriptorSet descriptorWrite;
+			//descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			//descriptorWrite.dstSet = mat.descriptorSets[i];
+			//descriptorWrite.dstBinding = 1;
+			//descriptorWrite.dstArrayElement = 0;
+			//descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			//descriptorWrite.descriptorCount = 1;
+			//descriptorWrite.pBufferInfo = &bufferInfo;
+
+			//vkUpdateDescriptorSets(device->device, 1, &descriptorWrite, 0, nullptr);
+
+			VkDescriptorBufferInfo bufferInfo{};
+			bufferInfo.buffer = mat.buffer[i];
+			bufferInfo.offset = 0;
+			bufferInfo.range = bufferSize;
+
+			std::vector<VkWriteDescriptorSet> descriptorWrites;
+			descriptorWrites.resize(1);
+			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[0].dstSet = mat.descriptorSets[i];
+			descriptorWrites[0].dstBinding = 0;
+			descriptorWrites[0].dstArrayElement = 0;
+			descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[0].descriptorCount = 1;
+			descriptorWrites[0].pBufferInfo = &bufferInfo;
+			
+			if (mat.color_texture.valid) {
+				descriptorWrites.resize(2);
+				VkDescriptorImageInfo imageInfo{};
+				imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				imageInfo.imageView = mat.color_texture.view;
+				imageInfo.sampler = mat.color_texture.sampler;
+
+				descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				descriptorWrites[1].dstSet = mat.descriptorSets[i];
+				descriptorWrites[1].dstBinding = 1;
+				descriptorWrites[1].dstArrayElement = 0;
+				descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				descriptorWrites[1].descriptorCount = 1;
+				descriptorWrites[1].pImageInfo = &imageInfo;
+			}
+
+			vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+		}
+
+		
 	}
+
+	//vkDestroyDescriptorSetLayout(device->device, tempDescriptorSetLayout, nullptr);
+
+
+
+
 }
 
-void Model::updateMaterialBuffer(uint32_t idx)
+void Model::updateMaterial(Material &mat)
 {
-	void* data;
-	vkMapMemory(device->device, materialMemory[idx], 0, sizeof(MaterialProperties), 0, &data);
-	memcpy(data, &materials[0].properties, sizeof(MaterialProperties));
-	vkUnmapMemory(device->device, materialMemory[idx]);
+	for(auto i = 0; i < swapChainSize; i++){
+		void* data;
+		vkMapMemory(device->device, mat.memory[i], 0, sizeof(MaterialProperties), 0, &data);
+		memcpy(data, &mat.properties, sizeof(MaterialProperties));
+		vkUnmapMemory(device->device, mat.memory[i]);
+	}
 }

@@ -10,7 +10,7 @@ class Pipeline
 public:
   Device* device;
   VkExtent2D swapChainExtent;
-  VkDescriptorSetLayout descriptorSetLayout;
+  std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
   VkRenderPass renderPass;
   uint32_t pushConstantSize;
   VkSampleCountFlagBits msaaSamples;

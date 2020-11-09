@@ -5,7 +5,7 @@ layout(push_constant) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-layout(binding = 0) uniform Model {
+layout(set = 0, binding = 0) uniform Model {
   mat4 pos;
 } model;
 
@@ -21,6 +21,7 @@ void main()
 {
 
 	outUVW = inPosition;
+  outUVW.xy *= -1;
   vec4 pos = ubo.proj *  model.pos  * vec4(inPosition, 1.0);
   gl_Position = pos.xyww;
 }

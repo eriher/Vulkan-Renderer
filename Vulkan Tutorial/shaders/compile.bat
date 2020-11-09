@@ -2,6 +2,7 @@ C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shader.vert -o vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shader.frag -o frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe pbr_shader.vert -o pbr_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe pbr_shader.frag -o pbr_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe pbr_shader_textured.frag -o pbr_textured_frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe skybox.vert -o skybox_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe skybox.frag -o skybox_frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.vert -o equi_vert.spv
@@ -9,3 +10,12 @@ C:/VulkanSDK/1.2.148.1/Bin/glslc.exe equi.frag -o equi_frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.vert -o cubemap_vert.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe cubemap.frag -o cubemap_frag.spv
 C:/VulkanSDK/1.2.148.1/Bin/glslc.exe irradiancemap.frag -o irradiancemap.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe reflectmap.frag -o reflectmap.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowmap.vert -o shadowmap_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowmap.frag -o shadowmap_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowmap_debug.vert -o shadowmap_debug_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowmap_debug.frag -o shadowmap_debug_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowcubemap.vert -o shadowcubemap_vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe shadowcubemap.frag -o shadowcubemap_frag.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe basic.vert -o basic.vert.spv
+C:/VulkanSDK/1.2.148.1/Bin/glslc.exe basic.frag -o basic.frag.spv

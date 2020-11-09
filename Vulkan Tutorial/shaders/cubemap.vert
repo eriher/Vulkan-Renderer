@@ -1,5 +1,6 @@
 #version 450
 #extension GL_EXT_multiview : enable
+
 layout(binding = 0) uniform UBO {
   mat4 proj;
   mat4 view[6];
@@ -15,5 +16,6 @@ layout (location = 0) out vec3 localPos;
 void main()
 {
     localPos = inPosition;  
+    //localPos.z *= -1;
     gl_Position =  (ubo.proj * ubo.view[gl_ViewIndex] * vec4(localPos, 1.0)).xyww;
 }

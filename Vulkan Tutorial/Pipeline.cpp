@@ -63,10 +63,12 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   if(vertFilePath.find("skybox") != vertFilePath.npos || vertFilePath.find("equi") != vertFilePath.npos)
-    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
-  else
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  else
+    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+  //rasterizer.cullMode = VK_CULL_MODE_NONE;
+  //rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -104,8 +106,8 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
 
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+  pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+  pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
 
   pipelineLayoutInfo.pushConstantRangeCount = 1;
   pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -158,10 +160,11 @@ void Pipeline::createDescriptorSetLayout() {
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
   layoutInfo.pBindings = bindings.data();
-
+  VkDescriptorSetLayout descriptorSetLayout;
   if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor set layout!");
   }
+  descriptorSetLayouts.push_back(descriptorSetLayout);
 }
 
 void Pipeline::cleanup()
@@ -170,7 +173,8 @@ void Pipeline::cleanup()
   //  model->cleanup();
   //  delete model;
   //}
-  vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
+  for(auto& descriptorSetLayout: descriptorSetLayouts)
+    vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
   vkDestroyPipeline(device->device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);
 }

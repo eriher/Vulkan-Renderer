@@ -1,9 +1,12 @@
 #pragma once
 #include "vulkan/vulkan.h"
 #include "Device.h"
-
+#include "Tools.h"
 
 class Texture {
+	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	//VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	//VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 public:
 	bool valid = false;
 	std::string filename;
@@ -18,7 +21,11 @@ public:
 	uint32_t              layerCount;
 	VkDescriptorImageInfo descriptor;
 	VkSampler             sampler;
-	VkFormat imageFormat;
+	VkDescriptorSetLayout descriptorSetLayout;
+	std::vector<VkDescriptorSet> descriptorSets;
+	VkDescriptorSet descriptorSet;
+
+
 	VkSampleCountFlagBits numSamples;
 	VkFormat format;
 	VkImageTiling tiling;
@@ -37,4 +44,5 @@ public:
 	void cleanup();
 	void createImage();
 	void createImageView();
+	void createDescriptors();
 };

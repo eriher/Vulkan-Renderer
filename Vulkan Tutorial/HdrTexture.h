@@ -5,6 +5,12 @@
 #include <iostream>
 class HdrTexture
 {
+
+	//VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	//VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+	VkFormat imageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+	VkDeviceSize testSize;
 	public:
 		Device* device;
 		VkImage               image;
