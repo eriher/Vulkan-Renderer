@@ -44,7 +44,7 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
   //depth and view buffers
   VkDeviceSize bufferSize = sizeof(OffscreenUbo);
   glm::vec3 eye = lightPos;
-  float near_plane = 1.0f, far_plane = 150.0f;
+  float near_plane = 1.0f, far_plane = 100.0f;
   
   /*glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane);
   proj[1][1] *= -1;*/
@@ -170,7 +170,7 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   samplerInfo.magFilter = VK_FILTER_LINEAR;
   samplerInfo.minFilter = VK_FILTER_LINEAR;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
   samplerInfo.addressModeV = samplerInfo.addressModeU;
   samplerInfo.addressModeW = samplerInfo.addressModeU;
   samplerInfo.anisotropyEnable = VK_FALSE;
@@ -428,8 +428,8 @@ void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkP
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
     //rasterizer.cullMode = VK_CULL_MODE_NONE;
 
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    //VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;

@@ -26,12 +26,12 @@ layout(set=5, binding = 0) uniform samplerCube irradianceMap;
 layout(set=5, binding = 1) uniform samplerCube reflectionMap;
 
 layout(location = 0) in vec3 viewSpaceNormal; 
-layout(location = 1) in vec3 worldSpacePosition; 
+layout(location = 1) in vec3 viewSpacePosition; 
 layout(location = 2) in mat4 viewMatrix; 
 
 layout(location = 0) out vec4 outColor;
 
-vec3 viewSpacePosition;
+#define EPSILON 0.015
 
 vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 {
@@ -47,7 +47,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	if(direction <= 0)
 		return vec3(0.0);
 	//return vec3(0.5);
-	vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),1.0));
+	vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
 	//return li;
 	///////////////////////////////////////////////////////////////////////////
 	// Task 1.3 - Calculate the diffuse term and return that as the result
@@ -123,10 +123,57 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
 }
 
 
+float shadowPCF(vec3 sc)
+{
+	float currentDepth = length(sc);
+
+	vec3 sampleOffsetDirections[20] = vec3[]
+	(
+		 vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+		 vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+		 vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+		 vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+		 vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+	);   
+	
+	float shadow = 0.0;
+	float bias   = 0.15;
+	int samples  = 20;
+	float viewDistance = length(viewSpacePosition);
+	float diskRadius = (1.0 + (viewDistance / 100.0)) / 50.0;  
+	//diskRadius = 0.01;
+	for(int i = 0; i < samples; ++i)
+	{
+			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
+			if(currentDepth - bias > closestDepth)
+					shadow += 1.0;
+	}
+	shadow /= float(samples);  
+	return shadow;
+}
+
+float shadowPCF(vec3 lightVec, float currentDepth){
+	float shadow  = 0.0;
+	float bias    = 0.05; 
+	float samples = 4.0;
+	float offset  = 0.1;
+	for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+	{
+			for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+			{
+					for(float z = -offset; z < offset; z += offset / (samples * 0.5))
+					{
+							float closestDepth = texture(shadowCubeMap, lightVec + vec3(x, y, z)).r; 
+							if(currentDepth - bias > closestDepth)
+								shadow += 1.0;
+					}
+			}
+	}
+	shadow /= (samples * samples * samples);
+	return shadow;
+}
 
 void main() {
-	viewSpacePosition = (viewMatrix * vec4(worldSpacePosition,1.0)).xyz;
-    //outColor = texture(texSampler, fragTexCoord);
 	vec3 emission_term = m.emission * m.color.rgb;
 
 	//emission_term = emission_term / (emission_term + vec3(1.0));
@@ -141,27 +188,29 @@ void main() {
 	vec3 direct_illumination_term = vec3(0.0);
 	
 	//Shadow
-	vec3 worldLightVec = worldSpacePosition - light.position.xyz;
+	vec3 worldLightVec = (inverse(viewMatrix)*vec4((n*0.02)+viewSpacePosition,1.0)).xyz - light.position.xyz;
 	float sampledDist = texture(shadowCubeMap, worldLightVec).r;
 	float dist = length(worldLightVec);
 	float shadow = 0.0f;
-	if(sampledDist > 0.015){
-		shadow = (dist <= sampledDist + 0.015) ? 1.0 : 0.0f;
-	}
-	{ // Direct illumination
-		direct_illumination_term = calculateDirectIllumiunation(wo, n);
-	}
 
-	//direct_illumination_term *= shadow;
+	//is fragment in shadow??
+	if(dist > sampledDist + EPSILON)
+		shadow = 1.0f;
+		//shadow = shadowPCF(worldLightVec);
+	shadow = shadow = shadowPCF(worldLightVec);
+	//if(shadow < (1.0 - 0.001))
+	{ // Direct illumination
+		direct_illumination_term = (1.0 - shadow) * calculateDirectIllumiunation(wo, n);
+	}
 
 	vec3 indirect_illumination = vec3(0.0);
 	indirect_illumination = calculateIndirectIllumination(wo,n);
 	
 
-	vec3 color = emission_term + (shadow * direct_illumination_term) + indirect_illumination;
+	vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
 
   color = color / (color + vec3(1.0));
-  color = pow(color, vec3(1.0/2.2));  
+  //color = pow(color, vec3(1.0/2.2));  
 
 	outColor = vec4(color,1.0);
 

@@ -1,7 +1,13 @@
 #version 450
 #define PI 3.14159265359
 
-layout(set=1, binding = 0) uniform Material {
+layout(set=0, binding = 0) uniform Light { 
+	vec4 position;
+	vec4 color;
+	float intensity;
+} light;
+
+layout(set=2, binding = 0) uniform Material {
 	vec4	color;
 	float		reflectivity;
 	float		shininess;
@@ -11,16 +17,13 @@ layout(set=1, binding = 0) uniform Material {
 	float		transparency;
 } m;
 
-layout(set = 1, binding = 1) uniform sampler2D colorTexture;
+layout(set = 2, binding = 1) uniform sampler2D colorTexture;
 
-layout(set=0, binding = 1) uniform Light { 
-	vec4 position;
-	vec4 color;
-	float intensity;
-} light;
+layout(set=3, binding = 1) uniform sampler2D shadowMap;
+layout(set=4, binding = 0) uniform samplerCube shadowCubeMap;
 
-layout(set=0, binding = 2) uniform samplerCube irradianceMap;
-layout(set=0, binding = 3) uniform samplerCube reflectionMap;
+layout(set=5, binding = 0) uniform samplerCube irradianceMap;
+layout(set=5, binding = 1) uniform samplerCube reflectionMap;
 
 layout(location = 0) in vec3 viewSpaceNormal; 
 layout(location = 1) in vec3 viewSpacePosition; 
@@ -29,6 +32,7 @@ layout(location = 6) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
+#define EPSILON 0.015
 vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 {
 	vec3 lightPos = (viewMatrix * light.position).xyz;
@@ -118,11 +122,59 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
 	return m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term;
 }
 
+float shadowPCF(vec3 lightVec, float currentDepth){
+	float shadow  = 0.0;
+	float bias    = 0.05; 
+	float samples = 4.0;
+	float offset  = 0.1;
+	for(float x = -offset; x < offset; x += offset / (samples * 0.5))
+	{
+			for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+			{
+					for(float z = -offset; z < offset; z += offset / (samples * 0.5))
+					{
+							float closestDepth = texture(shadowCubeMap, lightVec + vec3(x, y, z)).r; 
+							if(currentDepth - bias > closestDepth)
+								shadow += 1.0;
+					}
+			}
+	}
+	shadow /= (samples * samples * samples);
+	return shadow;
+}
+
+float shadowPCF(vec3 sc)
+{
+	float currentDepth = length(sc);
+
+	vec3 sampleOffsetDirections[20] = vec3[]
+	(
+		 vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+		 vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+		 vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+		 vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+		 vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+	);   
+	
+	float shadow = 0.0;
+	float bias   = 0.15;
+	int samples  = 20;
+	float viewDistance = length(viewSpacePosition);
+	float diskRadius = (1.0 + (viewDistance / 100.0)) / 50.0;  
+	//diskRadius = 0.01;
+	for(int i = 0; i < samples; ++i)
+	{
+			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
+			if(currentDepth - bias > closestDepth)
+					shadow += 1.0;
+	}
+	shadow /= float(samples);  
+	return shadow;
+}
 
 
 void main() {
-    //outColor = texture(texSampler, fragTexCoord);
-	vec3 emission_term = m.emission * texture(colorTexture,fragTexCoord).rgb;
+	vec3 emission_term = m.emission * m.color.rgb;
 
 	//emission_term = emission_term / (emission_term + vec3(1.0));
 	//emission_term = pow(emission_term, vec3(1.0/2.2)); 
@@ -134,18 +186,32 @@ void main() {
 	vec3 n = normalize(viewSpaceNormal);
 	
 	vec3 direct_illumination_term = vec3(0.0);
+	
+	//Shadow
+	vec3 worldLightVec = (inverse(viewMatrix)*vec4((n*0.02)+viewSpacePosition,1.0)).xyz - light.position.xyz;
+	float sampledDist = texture(shadowCubeMap, worldLightVec).r;
+	float dist = length(worldLightVec);
+	
+	float shadow = 0.0f;
+
+	//is fragment in shadow??
+	if(dist > sampledDist+EPSILON)
+		shadow = 1.0f;
+		//shadow = shadowPCF(worldLightVec);
+	shadow = shadow = shadowPCF(worldLightVec);
+	//if(shadow < (1.0 - 0.001))
 	{ // Direct illumination
-		direct_illumination_term = calculateDirectIllumiunation(wo, n);
+		direct_illumination_term = (1.0 - shadow) * calculateDirectIllumiunation(wo, n);
 	}
-	direct_illumination_term = direct_illumination_term / (direct_illumination_term + vec3(1.0));
-  //color = pow(color, vec3(1.0/2.2));  
+	
+
 	vec3 indirect_illumination = vec3(0.0);
 	indirect_illumination = calculateIndirectIllumination(wo,n);
 	
 
-	vec3 color = emission_term + direct_illumination_term + indirect_illumination;
+	vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
 
-  //color = color / (color + vec3(1.0));
+  color = color / (color + vec3(1.0));
   //color = pow(color, vec3(1.0/2.2));  
 
 	outColor = vec4(color,1.0);

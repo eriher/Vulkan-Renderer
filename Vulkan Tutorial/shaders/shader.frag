@@ -96,9 +96,9 @@ float filterPCF2(vec3 sc)
 	float shadow = 0.0;
 	float bias   = 0.015;
 	int samples  = 20;
-	//float viewDistance = length((viewMatrix * vec4(worldSpacePosition,1.0)).xyz);
-	float diskRadius = 0.005;
-	//float diskRadius = (1.0 + (viewDistance / 100.0)) / 25.0;  
+	float viewDistance = length((viewMatrix * vec4(worldSpacePosition,1.0)).xyz);
+	//float diskRadius = 0.005;
+	float diskRadius = (1.0 + (viewDistance / 100.0)) / 25.0;  
 	for(int i = 0; i < samples; ++i)
 	{
 			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
@@ -140,47 +140,46 @@ void main() {
     //ambient
     vec3 amb = 0.15 * color;
 
-		// diffuse
-		vec3 wo = normalize(-viewSpacePosition);
-		vec3 n = normalize(viewSpaceNormal);
-		
-		vec3 lightPos = (viewMatrix * light.position).xyz;
-		vec3 lightVec = lightPos - viewSpacePosition;
-		vec3 wi = normalize(lightVec);
-		vec3 li = light.intensity * light.color.rgb * (1/pow(length(lightVec),1.0));
-		///li = li/(li+vec3(1.0));
-    float diff = max(dot(wi, n), 0.0);
-    vec3 diffuse = diff * li;	
-    
-		// specular
-    float spec = 0.0;
-		vec3 wh = normalize(wi + wo);
-		float val = dot(n, wh);
-		if(val > 0)
-			spec = pow(val, 64.0);
-		else
-			spec = 0.0;
-    //spec = pow(max(dot(n, wh), 0.0), 64.0);
-    vec3 specular = spec * li;    
-    
+		vec3 diffuse = vec3(0.0);
+		vec3 specular = vec3(0.0);
 
 		//Shadow
 		vec3 worldLightVec = worldSpacePosition - light.position.xyz;
-		//worldLightVec.xy *= -1;
 		float sampledDist = texture(shadowCubeMap, worldLightVec).r;
 		float dist = length(worldLightVec);
 
-		float shadow = 0.0f;
-		if(sampledDist > EPSILON){
-			shadow = (dist <= sampledDist + EPSILON) ? 1.0 : 0.0f;
-		}
-		//shadow = filterPCF2(worldLightVec);
+		if(dist <= sampledDist + EPSILON)
+		{
+			// diffuse
+			vec3 wo = normalize(-viewSpacePosition);
+			vec3 n = normalize(viewSpaceNormal);
+		
+			vec3 lightPos = (viewMatrix * light.position).xyz;
+			vec3 lightVec = lightPos - viewSpacePosition;
+			vec3 wi = normalize(lightVec);
+			vec3 li = light.intensity * light.color.rgb * (1/pow(length(lightVec),2.0));
+			float diff = max(dot(wi, n), 0.0);
+			diffuse = diff * li;	
+    
+			// specular
+			float spec = 0.0;
+			vec3 wh = normalize(wi + wo);
+			float val = dot(n, wh);
+			if(val > 0)
+				spec = pow(val, 64.0);
+			else
+				spec = 0.0;
+			//spec = pow(max(dot(n, wh), 0.0), 64.0);
+			specular = spec * li;    
+    }
+
+		color = (amb+diffuse+specular) * color;
 		
 		//Tonemapping??
-		float exposure = 1.0f;
-		vec3 hdrColor = (amb + shadow * (diffuse+specular)) * color;
-		vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+		//float exposure = 1.0f;
 		
-		outColor = vec4(mapped, 1.0);
+		//vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+		
+		outColor = vec4(color, 1.0);
 }
 

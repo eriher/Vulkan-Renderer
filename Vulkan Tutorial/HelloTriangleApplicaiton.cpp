@@ -55,8 +55,8 @@ const std::array<std::pair<std::string, std::string>, 2> MODEL_PATH = {
   //,std::make_pair("models/cube.obj","scenes/concrete.jpg")
   //,std::make_pair("models/sphere.obj","scenes/concrete.jpg")
   //,std::make_pair("models/cube.obj","scenes/concrete.jpg")
-  ,std::make_pair("models/quad.obj","textures/texture.jpg")
-  //,std::make_pair("models/sphere.obj","scenes/concrete.jpg")
+  //,std::make_pair("models/quad.obj","textures/texture.jpg")
+  ,std::make_pair("models/sphere.obj","scenes/concrete.jpg")
   //,std::make_pair("models/cube.obj","scenes/concrete.jpg")
   //,std::make_pair("scenes/landingpad.obj","scenes/concrete.jpg")
   //,std::make_pair("models/quad.obj","scenes/concrete.jpg")
@@ -1220,7 +1220,7 @@ private:
       glm::vec4(5.0f,0.0f,0.0f,1.0f),
       glm::vec4(0.0f,0.0f,-5.0f,1.0f),
       glm::vec4(-5.0f,0.0f,0.0f,1.0f),
-      glm::vec4(0.0f,-30.0f, 0.0f,1.0f),
+      glm::vec4(0.0f,-10.0f, 0.0f,1.0f),
       glm::vec4(0.0f,0.0f,5.0f,1.0f),
       glm::vec4(0.0f,0.0f,-5.0f,1.0f),
       glm::vec4(3.0f,0.0f,-3.0f,1.0f),
@@ -1229,6 +1229,7 @@ private:
       //glm::vec4(0.0f,0.0f,1.0f,0.1f),
     };
     int posIndx = 0;
+    //non-material models
     for (auto& pair : MODEL_PATH) {
       std::cout << pair.first << std::endl;
       auto m = std::make_shared<Model>();
@@ -1245,6 +1246,7 @@ private:
       posIndx++;
       //models.push_back(&trad.models.back());
     }
+    //material models
     for (auto& path : MATERIAL_MODEL_PATH) {
       std::cout << path << std::endl;
       auto m = std::make_shared<Model>();
@@ -1279,20 +1281,50 @@ private:
       posIndx++;
       //models.push_back(&pbr.models.back());
     }
-    //models
-    //for (auto& path : MATERIAL_TEXTURED_MODEL_PATH) {
-    //  std::cout << path << std::endl;
-    //  Model m;
-    //  m.device = &device;
-    //  m.swapChainSize = swapChainImages.size();
-    //  m.loadModel(path);
-    //  m.modelPos[3] = positions[tmpMult];
-    //  m.createDescriptorBuffers();
-    //  m.createDescriptorSetLayout();
-    //  m.createDescriptorSets();
-    //  trad.models.push_back(m);
-    //  tmpMult++;
-    //}
+    //textured material models
+    for (auto& path : MATERIAL_TEXTURED_MODEL_PATH) {
+      std::cout << path << std::endl;
+      auto m = std::make_shared<Model>();
+      //Model m;
+      m->device = &device;
+      m->swapChainSize = swapChainImages.size();
+      m->loadModel(path);
+      m->modelPos[3] = positions[posIndx];
+      m->modelPos = glm::rotate(m->modelPos, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+      m->createDescriptorBuffers();
+      m->createDescriptorSetLayout();
+      m->createDescriptorSets();
+
+      VkDescriptorSetLayoutBinding fragLayoutBinding{};
+      fragLayoutBinding.binding = 0;
+      fragLayoutBinding.descriptorCount = 1;
+      fragLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      fragLayoutBinding.pImmutableSamplers = nullptr;
+      fragLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+      VkDescriptorSetLayoutBinding fragTextureBinding{};
+      fragTextureBinding.binding = 1;
+      fragTextureBinding.descriptorCount = 1;
+      fragTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      fragTextureBinding.pImmutableSamplers = nullptr;
+      fragTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+      std::array<VkDescriptorSetLayoutBinding, 2> bindings = { fragLayoutBinding, fragTextureBinding };
+
+      VkDescriptorSetLayoutCreateInfo layoutInfo{};
+      layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+      layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+      layoutInfo.pBindings = bindings.data();
+
+      if (vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &m->materialDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+      }
+
+      m->createMaterialBuffers();
+      pbr_textured.models.push_back(m);
+      models.push_back(m);
+      posIndx++;
+    }
 
     //std::cout << "valid pointer?" << models[0]->name << std::endl;
   }
@@ -1316,6 +1348,7 @@ private:
       trad.pipeline.createGraphicsPipeline("shaders/vert.spv", "shaders/frag.spv");
     }
 
+    //MATERIAL MODELS
     {
       pbr.pipeline.device = &device;
       pbr.pipeline.swapChainExtent = swapChainExtent;
@@ -1332,6 +1365,25 @@ private:
       pbr.pipeline.descriptorSetLayouts.push_back(skybox.texture.pbrDescriptorSetLayout);
       
       pbr.pipeline.createGraphicsPipeline("shaders/pbr_vert.spv", "shaders/pbr_frag.spv");
+    }
+
+    //Textured MATERIAL MODELS
+    {
+      pbr_textured.pipeline.device = &device;
+      pbr_textured.pipeline.swapChainExtent = swapChainExtent;
+      pbr_textured.pipeline.renderPass = renderPass;
+      pbr_textured.pipeline.pushConstantSize = sizeof(UniformBufferObject);
+      pbr_textured.pipeline.msaaSamples = msaaSamples;
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
+
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(pbr_textured.models[0]->descriptorSetLayout);
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(pbr_textured.models[0]->materialDescriptorSetLayout);
+
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.descriptorLayout);
+      pbr_textured.pipeline.descriptorSetLayouts.push_back(skybox.texture.pbrDescriptorSetLayout);
+
+      pbr_textured.pipeline.createGraphicsPipeline("shaders/pbr_vert.spv", "shaders/pbr_textured_frag.spv");
     }
 
     ////MATERIAL MODELS
@@ -1954,59 +2006,87 @@ private:
 
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        //The Traditional models
-
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.graphicsPipeline);
+        //Non-material models
+        {
+          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.graphicsPipeline);
           
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
         
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 4, 1, &shadowCubeMap.descriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 4, 1, &shadowCubeMap.descriptor, 0, nullptr);
         
-        for(auto& model: trad.models){
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 1, 1, &model->descriptorSets[i], 0, nullptr);
+          for(auto& model: trad.models){
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 1, 1, &model->descriptorSets[i], 0, nullptr);
 
-          VkBuffer vertexBuffers[] = { model->vertexBuffer };
-          VkDeviceSize offsets[] = { 0 };
-          vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-          vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            VkBuffer vertexBuffers[] = { model->vertexBuffer };
+            VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+            vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-          for (auto& mesh : model->meshes) {
-            if(model->name.find("quad") != std::string::npos)
-              vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &renderedTexture.descriptor, 0, nullptr);
-              //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &shadowCubeMap.descriptor, 0, nullptr);
-            else
-              vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &model->textures[mesh.texture].descriptorSet, 0, nullptr);
-            vkCmdDrawIndexed(commandBuffers[i], mesh.indices, 1, mesh.start_index, 0, 0);
+            for (auto& mesh : model->meshes) {
+              if(model->name.find("quad") != std::string::npos)
+                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &renderedTexture.descriptor, 0, nullptr);
+                //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &shadowCubeMap.descriptor, 0, nullptr);
+              else
+                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 2, 1, &model->textures[mesh.texture].descriptorSet, 0, nullptr);
+              vkCmdDrawIndexed(commandBuffers[i], mesh.indices, 1, mesh.start_index, 0, 0);
+            }
           }
         }
+        //PBR models
+        {
+          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.graphicsPipeline);
 
-        //The PBR models
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.graphicsPipeline);
-
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
 
 
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 5, 1, &skybox.texture.pbrDescriptorSet, 0, nullptr);
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 4, 1, &shadowCubeMap.descriptor, 0, nullptr);
-        for (auto& model : pbr.models) {
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 5, 1, &skybox.texture.pbrDescriptorSet, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 4, 1, &shadowCubeMap.descriptor, 0, nullptr);
+          for (auto& model : pbr.models) {
 
-          VkBuffer vertexBuffers[] = { model->vertexBuffer };
-          VkDeviceSize offsets[] = { 0 };
-          vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+            VkBuffer vertexBuffers[] = { model->vertexBuffer };
+            VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-          vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 1, 1, &model->descriptorSets[i], 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 1, 1, &model->descriptorSets[i], 0, nullptr);
 
-          for (auto& mesh : model->meshes) {
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 2, 1, &model->materials[mesh.material].descriptorSets[i], 0, nullptr);
-            vkCmdDrawIndexed(commandBuffers[i], mesh.indices, 1, mesh.start_index, 0, 0);
+            for (auto& mesh : model->meshes) {
+              vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 2, 1, &model->materials[mesh.material].descriptorSets[i], 0, nullptr);
+              vkCmdDrawIndexed(commandBuffers[i], mesh.indices, 1, mesh.start_index, 0, 0);
+            }
+
           }
-
         }
+        //Textured PBR models
+        {
+          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.graphicsPipeline);
 
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
+
+
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 5, 1, &skybox.texture.pbrDescriptorSet, 0, nullptr);
+          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 4, 1, &shadowCubeMap.descriptor, 0, nullptr);
+          for (auto& model : pbr_textured.models) {
+
+            VkBuffer vertexBuffers[] = { model->vertexBuffer };
+            VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+            vkCmdBindIndexBuffer(commandBuffers[i], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 1, 1, &model->descriptorSets[i], 0, nullptr);
+
+            for (auto& mesh : model->meshes) {
+              vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.pipelineLayout, 2, 1, &model->materials[mesh.material].descriptorSets[i], 0, nullptr);
+              vkCmdDrawIndexed(commandBuffers[i], mesh.indices, 1, mesh.start_index, 0, 0);
+            }
+
+          }
+        }
         //The Textured PBR models
         /*vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_textured.pipeline.graphicsPipeline);
 
@@ -2403,7 +2483,7 @@ private:
         //}
         {
           ImGui::Text("Adjust Light");
-          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);
+          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 10000.0f);
           ImGui::ColorEdit3("LColor", &light.color.x);
           ImGui::DragFloat("X", &light.position[0]);
           ImGui::DragFloat("Y", &light.position[1]);

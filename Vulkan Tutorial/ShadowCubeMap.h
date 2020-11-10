@@ -11,7 +11,7 @@ class ShadowCubeMap
 		glm::mat4 views[6];
 		glm::vec4 lightPos;
 	};
-	uint32_t dim = 2048;
+	uint32_t dim = 4096;
 	//VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 	VkFormat colorFormat = VK_FORMAT_R32_SFLOAT;
 	//VkFormat colorFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
