@@ -1,5 +1,5 @@
 #include "HdrTexture.h"
-#define STB_IMAGE_IMPLEMENTATION
+
 
 void HdrTexture::cleanup() {
   vkDestroySampler(device->device, sampler, nullptr);
@@ -10,6 +10,7 @@ void HdrTexture::cleanup() {
 
 void HdrTexture::load(const std::string& fpath) {
   std::cout << "is hdr? " <<  stbi_is_hdr(fpath.c_str()) << std::endl;;
+
   float* pixels = stbi_loadf(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
   //stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
   VkDeviceSize imageSize = texWidth * texHeight * 4;

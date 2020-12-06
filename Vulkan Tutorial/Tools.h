@@ -6,7 +6,7 @@
 #include "Device.h"
 class Tools {
 public:
-  
+ 
   static glm::mat4 projection(glm::mat4 &&proj) {
     const glm::mat4 clip(
       1.0f, 0.0f, 0.0f, 0.0f,

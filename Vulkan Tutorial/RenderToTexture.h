@@ -6,8 +6,10 @@
 
 class RenderToTexture
 {
-	uint32_t dim = 2048;
-	VkFormat FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
+	uint32_t dim = 512;
+	//VkFormat FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
+	VkFormat FORMAT = VK_FORMAT_R16G16_SFLOAT;
+	//VkFormat FORMAT = VK_FORMAT_R32G32_SFLOAT;
 
 public:
 	Device* device;

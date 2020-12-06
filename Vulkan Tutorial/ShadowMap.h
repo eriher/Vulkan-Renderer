@@ -6,7 +6,7 @@
 
 class ShadowMap
 {
-	uint32_t dim = 2048;
+	uint32_t dim = 1024;
 	VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 	float depthBiasConstant = 1.25f;
 	float depthBiasSlope = 1.75f;

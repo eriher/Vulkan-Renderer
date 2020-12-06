@@ -2,7 +2,7 @@
 
 const float PI = 3.14159265359;
 
-layout (set = 0, binding = 1) uniform samplerCube environmentMap;
+layout (binding = 1) uniform samplerCube environmentMap;
 layout (push_constant) uniform UBO {float roughness;} ubo;
 layout (location = 0) in vec3 localPos;
 layout (location = 0) out vec4 outFragColor;
@@ -49,12 +49,13 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 
 void main()
 {		
-   vec3 N = normalize(localPos);    
+    vec3 N = normalize(localPos);
+    N.y *= -1;
     vec3 R = N;
     vec3 V = R;
 
-    const uint SAMPLE_COUNT = 4096u;
-    //const uint SAMPLE_COUNT = 1024u;
+    //const uint SAMPLE_COUNT = 4096u;
+    const uint SAMPLE_COUNT = 1024u;
     float totalWeight = 0.0;   
     vec3 prefilteredColor = vec3(0.0);     
     for(uint i = 0u; i < SAMPLE_COUNT; ++i)

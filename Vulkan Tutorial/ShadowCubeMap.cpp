@@ -1,22 +1,28 @@
 #include "ShadowCubeMap.h"
 
-void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<Model>> models) {
+void ShadowCubeMap::setupShadowMap(glm::vec4 *lightPos, std::vector<std::shared_ptr<Model>> &m, int frameCount) {
+  this->lightPos = lightPos;
+  models = m;
 	//create the color and depth images
-  createImage(colorImage,colorMemory, colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  createView(colorImage, colorView, colorFormat, VK_COMPONENT_SWIZZLE_R, VK_IMAGE_ASPECT_COLOR_BIT);
-  //createView(colorImage, colorView, colorFormat, VK_COMPONENT_SWIZZLE_IDENTITY, VK_IMAGE_ASPECT_COLOR_BIT);
+  colorImage.resize(frameCount);
+  colorView.resize(frameCount);
+  colorMemory.resize(frameCount);
+  for(auto i = 0; i < frameCount; i++){
+    createImage(colorImage[i],colorMemory[i], colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    createView(colorImage[i], colorView[i], colorFormat, VK_COMPONENT_SWIZZLE_R, VK_IMAGE_ASPECT_COLOR_BIT);
+    //createView(colorImage, colorView, colorFormat, VK_COMPONENT_SWIZZLE_IDENTITY, VK_IMAGE_ASPECT_COLOR_BIT);
+  }
 
   createImage(depthImage, depthMemory, Tools::findDepthFormat(device->physicalDevice), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
   createView(depthImage, depthView, Tools::findDepthFormat(device->physicalDevice), VK_COMPONENT_SWIZZLE_IDENTITY, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  //create renderpass
-  VkRenderPass renderPass;
   createRenderPass(&renderPass);
-	//create framebuffer
-  VkFramebuffer framebuffer;
-  createFramebuffer(&framebuffer, renderPass);
+
+  framebuffer.resize(frameCount);
+  for (auto i = 0; i < frameCount; i++)
+    createFramebuffer(i, renderPass);
+
   //create descriptorSetLayout
-  VkDescriptorSetLayout tempDescriptorSetLayout;
   {
     VkDescriptorSetLayoutBinding vertLayoutBinding{};
     vertLayoutBinding.binding = 0;
@@ -31,60 +37,20 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
 
-    if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &tempDescriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &renderDescriptorSetLayout) != VK_SUCCESS) {
       throw std::runtime_error("failed to create descriptor set layout!");
     }
   }
-  std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { tempDescriptorSetLayout ,models[0]->descriptorSetLayout};
+
+  std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { renderDescriptorSetLayout, models[0]->descriptorSetLayout};
+
 	//create graphicspipeline
-  VkPipelineLayout pipelineLayout;
-  VkPipeline pipeline;
   createGraphicsPipeline(&pipelineLayout, &pipeline, renderPass, descriptorSetLayouts);
 
-  //depth and view buffers
-  VkDeviceSize bufferSize = sizeof(OffscreenUbo);
-  glm::vec3 eye = lightPos;
-  float near_plane = 1.0f, far_plane = 100.0f;
-  
-  /*glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane);
-  proj[1][1] *= -1;*/
-
-  glm::mat4 proj = Tools::projection2(glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane));
-
-
-  //glm::mat4 viewMatrix = glm::mat4(1.0f);
-  //viewMatrix = glm::translate(viewMatrix, glm::vec3(lightPos));
-  //OffscreenUbo ubo = { proj,  {
-  // glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)),
-  // glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f)),
-  // glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-  // glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-  // glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f)),
-  // viewMatrix,
-  //}, lightPos };
-
-
-  //glm::mat4 lightViewMatrix = proj * glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-
-  OffscreenUbo ubo = { proj,  {
-   glm::lookAt(eye, eye + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-   glm::lookAt(eye, eye + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-   glm::lookAt(eye, eye + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-   glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-   glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-   glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-  }, lightPos };
-
+  //create render descriptor buffer
   device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer, bufferMemory);
-  void* data;
-  vkMapMemory(device->device, bufferMemory, 0, bufferSize, 0, &data);
-  memcpy(data, &ubo, bufferSize);
-  vkUnmapMemory(device->device, bufferMemory);
-
-  //allocate descriptorsets
-  VkDescriptorSet tempDescriptorSet;
   {
-    std::vector<VkDescriptorSetLayout> layouts(1, tempDescriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(1, renderDescriptorSetLayout);
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -92,7 +58,7 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
     allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
     allocInfo.pSetLayouts = layouts.data();
 
-    if (vkAllocateDescriptorSets(device->device, &allocInfo, &tempDescriptorSet) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device->device, &allocInfo, &renderDescriptorSet) != VK_SUCCESS) {
       throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
@@ -104,7 +70,7 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
     bufferInfo.range = bufferSize;
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = tempDescriptorSet;
+    descriptorWrites[0].dstSet = renderDescriptorSet;
     descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -114,57 +80,8 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
     vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
   }
 
-  //commandbuffer creation and render from lights position
-  {
-    auto commands = device->beginSingleTimeCommands(device->transientCommandPool);
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-    clearValues[1].depthStencil = { 1.0f, 0 };
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = framebuffer;
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent.height = dim;
-    renderPassInfo.renderArea.extent.width = dim;
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-
-    vkCmdBeginRenderPass(commands, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &tempDescriptorSet, 0, nullptr);
-
-    for (auto& m : models) {
-      vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &m->descriptorSets[0], 0, nullptr);
-      VkDeviceSize offsets[] = { 0 };
-      VkBuffer vertexBuffers[] = { m->vertexBuffer };
-
-      vkCmdBindVertexBuffers(commands, 0, 1, vertexBuffers, offsets);
-      vkCmdBindIndexBuffer(commands, m->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-      
-      for(auto& mesh: m->meshes)
-        vkCmdDrawIndexed(commands, mesh.indices, 1, mesh.start_index, 0, 0);
-    }
-
-    vkCmdEndRenderPass(commands);
-
-    if (vkEndCommandBuffer(commands) != VK_SUCCESS) {
-      throw std::runtime_error("failed to record command buffer!");
-    }
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commands;
-
-    if (vkQueueSubmit(device->graphicsQueue, 1, &submitInfo, nullptr) != VK_SUCCESS) {
-      throw std::runtime_error("failed to submit draw command buffer!");
-    }
-    vkDeviceWaitIdle(device->device);
-    vkFreeCommandBuffers(device->device, device->transientCommandPool, 1, &commands);
-  }
-
+  //BELOW FOR THE IMAGE TO BE SAMPELED FROM
 
   VkSamplerCreateInfo samplerInfo{};
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -188,8 +105,6 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
     throw std::runtime_error("failed to create texture sampler!");
   }
 
-
-
   VkDescriptorSetLayoutBinding samplerLayoutBinding{};
   samplerLayoutBinding.binding = 0;
   samplerLayoutBinding.descriptorCount = 1;
@@ -203,37 +118,105 @@ void ShadowCubeMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_
   layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
   layoutInfo.pBindings = bindings.data();
 
-  if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &descriptorLayout) != VK_SUCCESS) {
+  if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &shadowDescriptorSetLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor set layout!");
   }
 
+  shadowDescriptorSet.resize(frameCount);
+  std::vector<VkDescriptorSetLayout> layouts(frameCount, shadowDescriptorSetLayout);
   VkDescriptorSetAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   allocInfo.descriptorPool = device->descriptorPool;
-  allocInfo.descriptorSetCount = 1;
-  allocInfo.pSetLayouts = &descriptorLayout;
+  allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
+  allocInfo.pSetLayouts = layouts.data();
 
-  if (vkAllocateDescriptorSets(device->device, &allocInfo, &descriptor) != VK_SUCCESS) {
+  if (vkAllocateDescriptorSets(device->device, &allocInfo, shadowDescriptorSet.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate descriptor sets!");
   }
 
+  for (auto i = 0; i < frameCount; i++) {
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
 
-  std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = colorView[i];
+    imageInfo.sampler = sampler;
 
-  VkDescriptorImageInfo imageInfo{};
-  imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  imageInfo.imageView = colorView;
-  imageInfo.sampler = sampler;
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = shadowDescriptorSet[i];
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pImageInfo = &imageInfo;
 
-  descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  descriptorWrites[0].dstSet = descriptor;
-  descriptorWrites[0].dstBinding = 0;
-  descriptorWrites[0].dstArrayElement = 0;
-  descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  descriptorWrites[0].descriptorCount = 1;
-  descriptorWrites[0].pImageInfo = &imageInfo;
+    vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+  }
+}
 
-  vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+void ShadowCubeMap::cleanup()
+{
+
+  vkDestroyPipeline(device->device, pipeline, nullptr);
+  vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);
+  vkDestroyRenderPass(device->device, renderPass, nullptr);
+
+  vkFreeDescriptorSets(device->device, device->descriptorPool, 1, &renderDescriptorSet);
+  vkDestroyDescriptorSetLayout(device->device, renderDescriptorSetLayout, nullptr);
+
+  vkDestroyBuffer(device->device, buffer, nullptr);
+  vkFreeMemory(device->device, bufferMemory, nullptr);
+
+  
+  for(auto i = 0; i < colorImage.size(); i++){
+    vkDestroyFramebuffer(device->device, framebuffer[i], nullptr);
+    vkFreeDescriptorSets(device->device, device->descriptorPool, 1, &shadowDescriptorSet[i]);
+    vkDestroyImageView(device->device, colorView[i], nullptr);
+    vkDestroyImage(device->device, colorImage[i], nullptr);
+    vkFreeMemory(device->device, colorMemory[i], nullptr);
+  }
+
+  vkDestroySampler(device->device, sampler, nullptr);
+  vkDestroyImageView(device->device, depthView, nullptr);
+  vkDestroyImage(device->device, depthImage, nullptr);
+  vkFreeMemory(device->device, depthMemory, nullptr);
+
+  
+  vkDestroyDescriptorSetLayout(device->device, shadowDescriptorSetLayout, VK_NULL_HANDLE);
+
+}
+
+void ShadowCubeMap::draw(VkCommandBuffer &commands, int idx) {
+  std::array<VkClearValue, 2> clearValues{};
+  clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+  clearValues[1].depthStencil = { 1.0f, 0 };
+  VkRenderPassBeginInfo renderPassInfo{};
+  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+  renderPassInfo.renderPass = renderPass;
+  renderPassInfo.framebuffer = framebuffer[idx];
+  renderPassInfo.renderArea.offset = { 0, 0 };
+  renderPassInfo.renderArea.extent.height = dim;
+  renderPassInfo.renderArea.extent.width = dim;
+  renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+  renderPassInfo.pClearValues = clearValues.data();
+
+  vkCmdBeginRenderPass(commands, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &renderDescriptorSet, 0, nullptr);
+
+  for (auto& m : models) {
+    vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &m->descriptorSets[idx], 0, nullptr);
+    VkDeviceSize offsets[] = { 0 };
+    VkBuffer vertexBuffers[] = { m->vertexBuffer };
+
+    vkCmdBindVertexBuffers(commands, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commands, m->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    
+    for(auto& mesh: m->meshes)
+      vkCmdDrawIndexed(commands, mesh.indices, 1, mesh.start_index, 0, 0);
+  }
+
+  vkCmdEndRenderPass(commands);
 
 }
 
@@ -273,23 +256,39 @@ void ShadowCubeMap::createRenderPass(VkRenderPass* renderPass) {
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-    std::array<VkSubpassDependency, 2> dependencies;
+    //std::array<VkSubpassDependency, 2> dependencies;
+    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[0].dstSubpass = 0;
+    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
+    //dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[1].srcSubpass = 0;
+    //dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    //std::array<VkSubpassDependency, 1> dependencies;
+    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[0].dstSubpass = 0;
+    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].srcAccessMask = 0;
+    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    std::array<VkSubpassDependency, 1> dependencies;
     dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     dependencies[0].dstSubpass = 0;
-    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependencies[0].srcAccessMask = 0;
+    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[1].srcSubpass = 0;
-    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
     std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
     //std::array<VkAttachmentDescription, 1> attachments = { colorAttachment };
@@ -320,10 +319,10 @@ void ShadowCubeMap::createRenderPass(VkRenderPass* renderPass) {
     }
 }
 
-void ShadowCubeMap::createFramebuffer(VkFramebuffer* framebuffer, VkRenderPass &renderPass) {
+void ShadowCubeMap::createFramebuffer(int i, VkRenderPass &renderPass) {
 
   std::array<VkImageView, 2> attachments = {
-    colorView,
+    colorView[i],
     depthView
   };
 
@@ -340,7 +339,7 @@ void ShadowCubeMap::createFramebuffer(VkFramebuffer* framebuffer, VkRenderPass &
   framebufferInfo.height = dim;
   framebufferInfo.layers = 1;
 
-  if (vkCreateFramebuffer(device->device, &framebufferInfo, nullptr, framebuffer) != VK_SUCCESS) {
+  if (vkCreateFramebuffer(device->device, &framebufferInfo, nullptr, &framebuffer[i]) != VK_SUCCESS) {
     throw std::runtime_error("failed to create framebuffer!");
   }
   
@@ -349,11 +348,8 @@ void ShadowCubeMap::createFramebuffer(VkFramebuffer* framebuffer, VkRenderPass &
 void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkPipeline* pipeline, VkRenderPass &renderPass, std::vector< VkDescriptorSetLayout> & descriptorSetLayouts) {
   {
     
-    auto vertShaderCode = Tools::readFile("shaders/shadowcubemap_vert.spv");
-    auto fragShaderCode = Tools::readFile("shaders/shadowcubemap_frag.spv");
-
-    //auto vertShaderCode = Tools::readFile("shaders/basic.vert.spv");
-    //auto fragShaderCode = Tools::readFile("shaders/basic.frag.spv");
+    auto vertShaderCode = Tools::readFile("compiledshaders/shadowcubemap.vert.spv");
+    auto fragShaderCode = Tools::readFile("compiledshaders/shadowcubemap.frag.spv");
 
     VkShaderModule vertShaderModule = Tools::createShaderModule(device->device, vertShaderCode);
     VkShaderModule fragShaderModule = Tools::createShaderModule(device->device, fragShaderCode);
@@ -424,12 +420,14 @@ void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkP
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     
-    //rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    //rasterizer.cullMode = VK_CULL_MODE_NONE;
-
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    //VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE
+    //rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    //rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+    //rasterizer.cullMode = VK_CULL_MODE_NONE;
+    
+
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -475,12 +473,11 @@ void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkP
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    
 
-    if (vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->device, device->pipelineCache, 1, &pipelineInfo, nullptr, pipeline) != VK_SUCCESS) {
       throw std::runtime_error("failed to create graphics pipeline!");
     }
-
+    vkDestroyShaderModule(device->device, fragShaderModule, nullptr);
     vkDestroyShaderModule(device->device, vertShaderModule, nullptr);
   }
 }
@@ -541,4 +538,25 @@ void ShadowCubeMap::createView(VkImage &image, VkImageView &view, VkFormat forma
   if (vkCreateImageView(device->device, &viewInfo, nullptr, &view) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
   }
+}
+
+void ShadowCubeMap::updateRenderDescriptorSets() {
+  glm::vec3 eye = *lightPos;
+  float near_plane = 1.0f, far_plane = 100.0f;
+
+  glm::mat4 proj = Tools::projection2(glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane));
+
+  OffscreenUbo ubo = { proj,  {
+   glm::lookAt(eye, eye + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+   glm::lookAt(eye, eye + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+   glm::lookAt(eye, eye + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+   glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+   glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+   glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+  }, *lightPos };
+
+  void* data;
+  vkMapMemory(device->device, bufferMemory, 0, bufferSize, 0, &data);
+  memcpy(data, &ubo, bufferSize);
+  vkUnmapMemory(device->device, bufferMemory);
 }

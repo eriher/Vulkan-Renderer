@@ -11,7 +11,7 @@ void main()
 {		
     // the sample direction equals the hemisphere's orientation 
     vec3 normal = normalize(localPos);
-  
+    normal.y *= -1;
     vec3 irradiance = vec3(0.0);  
 
     vec3 up     = vec3(0.0, 1.0, 0.0);

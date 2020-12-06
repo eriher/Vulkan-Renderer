@@ -2,26 +2,26 @@
 
 void Device::createDescriptorPool() {
 
-	VkDescriptorPoolSize pool_sizes[11] =
+	VkDescriptorPoolSize pool_sizes[3] =
 	{
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
-			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
+			//{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 200 },
+			//{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 200 },
+			//{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
+			//{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 200 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
-			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 }
+			//{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0 },
+			//{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
+			//{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
+			//{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 }
 	};
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	pool_info.maxSets = 100 * 11;
-	pool_info.poolSizeCount = 11;
+	pool_info.maxSets = 2*20+1000;
+	pool_info.poolSizeCount = 3;
 	pool_info.pPoolSizes = pool_sizes;
 
 
@@ -32,11 +32,18 @@ void Device::createDescriptorPool() {
 }
 
 	void Device::cleanup() {
+		vkDestroyImageView(device, emptyImage.view, nullptr);
+		vkDestroyImage(device, emptyImage.image, nullptr);
+		vkDestroySampler(device, emptyImage.sampler, nullptr);
+		vkFreeMemory(device, emptyImage.memory, nullptr);
+
+
 		vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
 		vkDestroyCommandPool(device, transientCommandPool, nullptr);
 		vkDestroyCommandPool(device, resetCommandPool, nullptr);
 		vkDestroyCommandPool(device, transferCommandPool, nullptr);
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		vkDestroyDevice(device, nullptr);
 	}
 
@@ -47,6 +54,10 @@ void Device::createDescriptorPool() {
 			createLogicalDevice(enableValidationLayers);
 			createCommandPools();
 			createDescriptorPool();
+			VkPipelineCacheCreateInfo pipelineCacheCI{};
+			pipelineCacheCI.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+			pipelineCacheCI.initialDataSize = 0;
+			vkCreatePipelineCache(device, &pipelineCacheCI, VK_NULL_HANDLE, &pipelineCache);
 	}
 	//createBuffer
 

@@ -17,4 +17,4 @@ Pr 0
 Ke 0.5 0.5 0.5
 Tf 0 0 0
 map_Kd wheatley_lights.png
-map_Ke wheatley_lights.png
+map_Ke wheatley_emission.png

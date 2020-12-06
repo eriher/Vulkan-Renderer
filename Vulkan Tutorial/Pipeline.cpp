@@ -4,8 +4,8 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   auto vertShaderCode = readFile(vertFilePath);
   auto fragShaderCode = readFile(fragFilePath);
 
-  VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-  VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+  VkShaderModule vertShaderModule = Tools::createShaderModule(device->device, vertShaderCode);
+  VkShaderModule fragShaderModule = Tools::createShaderModule(device->device, fragShaderCode);
 
   VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
   vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -63,12 +63,13 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   if(vertFilePath.find("skybox") != vertFilePath.npos || vertFilePath.find("equi") != vertFilePath.npos)
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  else
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+  else
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  //rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   //rasterizer.cullMode = VK_CULL_MODE_NONE;
-  //rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  //rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -99,16 +100,15 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   colorBlending.blendConstants[2] = 0.0f;
   colorBlending.blendConstants[3] = 0.0f;
 
-  VkPushConstantRange pushConstantRange{};
-  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  pushConstantRange.offset = 0;
-  pushConstantRange.size = pushConstantSize;
-
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
   pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
 
+  VkPushConstantRange pushConstantRange{};
+  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  pushConstantRange.offset = 0;
+  pushConstantRange.size = pushConstantSize;
   pipelineLayoutInfo.pushConstantRangeCount = 1;
   pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
@@ -132,7 +132,7 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   pipelineInfo.subpass = 0;
   pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-  if (vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+  if (vkCreateGraphicsPipelines(device->device, device->pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
     throw std::runtime_error("failed to create graphics pipeline!");
   }
 
@@ -140,41 +140,8 @@ void Pipeline::createGraphicsPipeline(std::string vertFilePath, std::string  fra
   vkDestroyShaderModule(device->device, vertShaderModule, nullptr);
 }
 
-void Pipeline::createDescriptorSetLayout() {
-  VkDescriptorSetLayoutBinding uboLayoutBinding{};
-  uboLayoutBinding.binding = 0;
-  uboLayoutBinding.descriptorCount = 1;
-  uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  uboLayoutBinding.pImmutableSamplers = nullptr;
-  uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-  VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-  samplerLayoutBinding.binding = 1;
-  samplerLayoutBinding.descriptorCount = 1;
-  samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  samplerLayoutBinding.pImmutableSamplers = nullptr;
-  samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-  VkDescriptorSetLayoutCreateInfo layoutInfo{};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-  layoutInfo.pBindings = bindings.data();
-  VkDescriptorSetLayout descriptorSetLayout;
-  if (vkCreateDescriptorSetLayout(device->device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create descriptor set layout!");
-  }
-  descriptorSetLayouts.push_back(descriptorSetLayout);
-}
-
 void Pipeline::cleanup()
 {
-  //for (auto& model : models){
-  //  model->cleanup();
-  //  delete model;
-  //}
-  for(auto& descriptorSetLayout: descriptorSetLayouts)
-    vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
   vkDestroyPipeline(device->device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);
 }

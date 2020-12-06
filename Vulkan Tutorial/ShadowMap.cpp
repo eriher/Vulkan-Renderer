@@ -45,6 +45,14 @@ void ShadowMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
+    //std::array<VkSubpassDependency, 1> dependencies;
+    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[0].dstSubpass = 0;
+    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].srcAccessMask = 0;
+    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
     std::array<VkAttachmentDescription, 1> attachments = { depthAttachment };// , colorAttachmentResolve};
 
     VkRenderPassCreateInfo renderPassInfo{};
@@ -100,7 +108,7 @@ void ShadowMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<
   VkPipelineLayout pipelineLayout;
   VkPipeline pipeline;
   {
-    auto vertShaderCode = Tools::readFile("shaders/shadowmap_vert.spv");
+    auto vertShaderCode = Tools::readFile("compiledshaders/shadowmap.vert.spv");
 
     VkShaderModule vertShaderModule = Tools::createShaderModule(device->device, vertShaderCode);
 
@@ -215,7 +223,7 @@ void ShadowMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDynamicState = &dynamicStateCreateInfo;
 
-    if (vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->device, device->pipelineCache, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
       throw std::runtime_error("failed to create graphics pipeline!");
     }
 
@@ -414,5 +422,21 @@ void ShadowMap::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<
 
 
   vkUpdateDescriptorSets(device->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+}
+
+void ShadowMap::cleanup()
+{
+
+  vkFreeDescriptorSets(device->device, device->descriptorPool, 1, &descriptor);
+  vkDestroyDescriptorSetLayout(device->device, descriptorLayout, VK_NULL_HANDLE);
+
+  vkDestroySampler(device->device, sampler, nullptr);
+  vkDestroyImageView(device->device, view, nullptr);
+  vkDestroyImage(device->device, image, nullptr);
+  vkFreeMemory(device->device, imageMemory, nullptr);
+
+  vkDestroyBuffer(device->device, buffer, nullptr);
+  vkFreeMemory(device->device, bufferMemory, nullptr);
 
 }

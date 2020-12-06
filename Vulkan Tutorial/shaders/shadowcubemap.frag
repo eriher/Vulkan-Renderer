@@ -10,7 +10,6 @@ void main()
 {
 	// Store distance to light as 32 bit float value
     vec3 lightVec = inPos - inLightPos;
+    //outFragColor = min(length(lightVec),100.0f);
     outFragColor = length(lightVec);
-    //outFragColor = 10.0;
-    //outFragColor = distance(inPos.xyz, inLightPos);
 }

@@ -3,7 +3,23 @@
 void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::shared_ptr<Model>> models) {
 	//create the image holding depth buffer
 	Tools::createImage(device, image, imageMemory, dim, dim, FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SAMPLE_COUNT_1_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	Tools::createImageView(device, image, imageView, FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	
+  VkImageViewCreateInfo viewInfo{};
+  viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  viewInfo.image = image;
+  viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  viewInfo.format = FORMAT;
+  //viewInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G};
+  viewInfo.subresourceRange.aspectMask = 1;
+  viewInfo.subresourceRange.layerCount = 1;
+  viewInfo.subresourceRange.baseArrayLayer = 0;
+  viewInfo.subresourceRange.levelCount = 1;
+  viewInfo.subresourceRange.baseMipLevel = 0;
+
+  if (vkCreateImageView(device->device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create texture image view!");
+  }
+
   //create renderpass
   VkRenderPass renderPass;
   {
@@ -26,13 +42,32 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &attachmentRef;
 
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    //std::array<VkSubpassDependency, 1> dependencies;
+    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[0].dstSubpass = 0;
+    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].srcAccessMask = 0;
+    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    // Use subpass dependencies for layout transitions
+    //std::array<VkSubpassDependency, 2> dependencies;
+    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[0].dstSubpass = 0;
+    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    //dependencies[1].srcSubpass = 0;
+    //dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    //dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //dependencies[1].dstAccessMask = 0;
+    //dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
     std::array<VkAttachmentDescription, 1> attachments = { attachment };// , colorAttachmentResolve};
 
@@ -42,8 +77,9 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = static_cast<uint32_t>(1);
-    renderPassInfo.pDependencies = &dependency;
+    renderPassInfo.dependencyCount = 0;
+    //renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    //renderPassInfo.pDependencies = dependencies.data();
 
     if (vkCreateRenderPass(device->device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
       throw std::runtime_error("failed to create render pass!");
@@ -89,8 +125,8 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
   VkPipelineLayout pipelineLayout;
   VkPipeline pipeline;
   {
-    auto vertShaderCode = Tools::readFile("shaders/basic.vert.spv");
-    auto fragShaderCode = Tools::readFile("shaders/basic.frag.spv");
+    auto vertShaderCode = Tools::readFile("compiledshaders/brdf.vert.spv");
+    auto fragShaderCode = Tools::readFile("compiledshaders/brdf.frag.spv");
 
     VkShaderModule vertShaderModule = Tools::createShaderModule(device->device, vertShaderCode);
     VkShaderModule fragShaderModule = Tools::createShaderModule(device->device, fragShaderCode);
@@ -204,7 +240,7 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
 
-    if (vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->device, device->pipelineCache, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
       throw std::runtime_error("failed to create graphics pipeline!");
     }
 
@@ -331,6 +367,31 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
 
     vkCmdEndRenderPass(commands);
 
+
+     //must wait for 
+    VkMemoryBarrier memoryBarrier{};
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    //imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //imageMemoryBarrier.image = skybox->skyboxImage;
+    //imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    //imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    //imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+    //imageMemoryBarrier.subresourceRange.layerCount = 1;
+    //imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+    //imageMemoryBarrier.subresourceRange.levelCount = 1;
+
+
+    vkCmdPipelineBarrier(commands,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+      0,
+      1, &memoryBarrier,
+      0, nullptr,
+      0, nullptr);
+
     if (vkEndCommandBuffer(commands) != VK_SUCCESS) {
       throw std::runtime_error("failed to record command buffer!");
     }
@@ -352,16 +413,20 @@ void RenderToTexture::createShadowMap(glm::vec4 lightPos, std::vector<std::share
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   samplerInfo.magFilter = VK_FILTER_LINEAR;
   samplerInfo.minFilter = VK_FILTER_LINEAR;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
   samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.anisotropyEnable = VK_TRUE;
+  samplerInfo.anisotropyEnable = VK_FALSE;
   samplerInfo.maxAnisotropy = 16.0f;
-  samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
   samplerInfo.compareEnable = VK_FALSE;
-  samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+  samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
   samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  samplerInfo.minLod = 0.0f; // Optional
+  //samplerInfo.maxLod = static_cast<float>(mipLevels);
+  samplerInfo.maxLod = 1.0f;
+  samplerInfo.mipLodBias = 0.0f; // Optional
 
   if (vkCreateSampler(device->device, &samplerInfo, nullptr, &imageSampler) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");

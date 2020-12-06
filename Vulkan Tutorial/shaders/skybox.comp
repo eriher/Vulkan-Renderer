@@ -1,0 +1,32 @@
+#version 450
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+layout (binding = 0) uniform sampler2D srcImage;
+layout (binding = 1, rgba8) uniform imageCube resultImage;
+
+const float PI = 3.14159265359;
+const vec2 invAtan = vec2(0.1591, 0.3183);
+vec2 SampleSphericalMap(vec3 v)
+{
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+
+//  float theta = acos(max(-1.0f, min(1.0f, v.y)));
+//	float phi = atan(v.z, v.x);
+//	if (phi < 0.0f) phi = phi + 2.0f * PI;
+//	// Use these to lookup the color in the environment map
+//	return vec2(phi / (2.0 * PI), theta / PI);
+}
+void main() {
+
+  //float x = (gl_GlobalInvocationID.x / 512.0f);
+  //float y = 1.0f - (gl_GlobalInvocationID.y / 512.0f);
+  
+	vec3 color = texture(srcImage, SampleSphericalMap(normalize(gl_GlobalInvocationID.xyz))).rgb;
+  vec3 mapped = color / (color + vec3(1.0));
+  
+	imageStore(resultImage, ivec3(gl_GlobalInvocationID.xyz), vec4(mapped,1.0));
+}
+

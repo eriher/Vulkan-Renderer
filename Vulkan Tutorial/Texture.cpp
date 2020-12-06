@@ -1,18 +1,20 @@
 #include "Texture.h"
-#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION    
 #include "stb_image.h"
+
 
 void Texture::cleanup() {
   vkDestroySampler(device->device, sampler, nullptr);
   vkDestroyImageView(device->device, view, nullptr);
-
   vkDestroyImage(device->device, image, nullptr);
   vkFreeMemory(device->device, deviceMemory, nullptr);
 }
 
 void Texture::load(const std::string& filename) {
   int texWidth, texHeight, texChannels;
+  //stbi_set_flip_vertically_on_load(true);
   stbi_uc* pixels = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+  //stbi_set_flip_vertically_on_load(false);
   VkDeviceSize imageSize = texWidth * texHeight * 4;
   mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
@@ -44,10 +46,20 @@ void Texture::load(const std::string& filename) {
 
   createImageView(image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
   createTextureSampler();
-  createDescriptors();
+  //createDescriptors();
   valid = true;
 
 }
+
+void Texture::emptyTexture() {
+  mipLevels = 1;
+  Tools::createImage(device, image, deviceMemory, 0, 0, imageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 1);
+  createImageView(image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+  createTextureSampler();
+  valid = true;
+
+}
+
 
 void Texture::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
   VkImageCreateInfo imageInfo{};
@@ -355,9 +367,9 @@ void Texture::createTextureSampler() {
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   samplerInfo.magFilter = VK_FILTER_LINEAR;
   samplerInfo.minFilter = VK_FILTER_LINEAR;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerInfo.addressModeV = samplerInfo.addressModeU;
+  samplerInfo.addressModeW = samplerInfo.addressModeU;
   samplerInfo.anisotropyEnable = VK_TRUE;
   samplerInfo.maxAnisotropy = 16.0f;
   samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;

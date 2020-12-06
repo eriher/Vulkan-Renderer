@@ -24,12 +24,15 @@ struct Material
 {
 	std::string name;
 	MaterialProperties properties;
-	Texture color_texture;
-	Texture	reflectivity_texture;
-	Texture	shininess_texture;
-	Texture	metalness_texture;
-	Texture	fresnel_texture;
-	Texture	emission_texture;
+	Texture colorTexture;
+	Texture	reflectivityTexture;
+	Texture	shininessTexture;
+	Texture	metalnessTexture;
+	Texture	fresnelTexture;
+	Texture	emissionTexture;
+	Texture	normalTexture;
+	Texture aoTexture;
+	Texture depthTexture;
 
 	std::vector<VkBuffer> buffer;
 	std::vector<VkDeviceMemory> memory;
@@ -42,6 +45,7 @@ struct Mesh
 	std::string name;
 	uint32_t material;
 	uint32_t texture;
+	uint32_t normal;
 	// Where this Mesh's vertices start
 	uint32_t start_index;
 	uint32_t indices;
@@ -62,7 +66,6 @@ public:
 
 	std::vector<Mesh> meshes;
 
-	std::vector<Texture> textures;
 	std::vector<Material> materials;
 
 	uint32_t swapChainSize;
@@ -83,7 +86,6 @@ public:
 	uint32_t indices;
 
 	void loadModel(std::string modelPath);
-	void loadModel(std::string modelPath, std::string texturePath);
 	void updateDescriptors();
 	void updateDescriptor(uint32_t idx);
 	void updateModelpos(int keyFlags, float delta);
@@ -91,7 +93,7 @@ public:
 	void createDescriptorSets();
 	void createDescriptorBuffers();
 	void updateMaterial(Material &mat);
-	void createMaterialDescriptorSetLayout();
 	void createMaterialBuffers();
 	void cleanup();
+	void draw(VkCommandBuffer&, VkPipelineLayout&, int);
 };

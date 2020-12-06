@@ -2,7 +2,7 @@
 #include "vulkan/vulkan.h"
 #include "Device.h"
 #include "Tools.h"
-
+#include "stb_image.h"
 class Texture {
 	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
 	//VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
@@ -45,4 +45,5 @@ public:
 	void createImage();
 	void createImageView();
 	void createDescriptors();
+	void emptyTexture();
 };
