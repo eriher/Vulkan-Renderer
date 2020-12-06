@@ -29,8 +29,6 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="DirLight.cpp" />
-    <ClCompile Include="External\openfbx\miniz.c" />
-    <ClCompile Include="External\openfbx\ofbx.cpp" />
     <ClCompile Include="Gui.cpp" />
     <ClCompile Include="HdrTexture.cpp" />
     <ClCompile Include="Light.cpp" />
@@ -53,8 +51,6 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="DirLight.h" />
-    <ClInclude Include="External\openfbx\miniz.h" />
-    <ClInclude Include="External\openfbx\ofbx.h" />
     <ClInclude Include="Gui.h" />
     <ClInclude Include="HdrTexture.h" />
     <ClInclude Include="Light.h" />
