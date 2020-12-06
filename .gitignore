@@ -18,6 +18,7 @@ compiledshaders/
 *.rc
 *.vcxproj
 *.aps
+resource.h
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
