@@ -23,9 +23,9 @@ public:
 
   //std::vector<Model*> models;
 
-	void createGraphicsPipeline(std::string, std::string);
-  void createDescriptorSetLayout();
-  void cleanup();
+  virtual void createGraphicsPipeline(std::string, std::string);
+  virtual void cleanup();
+
   static std::vector<char> readFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 

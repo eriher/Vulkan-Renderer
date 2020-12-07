@@ -4,7 +4,7 @@
 class Camera
 {
 public:
-  Camera() {};
+  Camera():cameraPos(glm::vec3(0.0f, 0.0f, 10.0f)) {};
   Camera(glm::vec3 pos) :cameraPos(pos) {};
   Camera(float x, float y, float z) :cameraPos(x,y,z) {};
   glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);

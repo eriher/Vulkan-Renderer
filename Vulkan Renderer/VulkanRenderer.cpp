@@ -40,7 +40,9 @@
 #include "PBRMaps.h"
 #include "BrdfCompute.h"
 #include "Camera.h"
-
+#include "RenderingPipeline.h"
+#include "PbrPipeline.h"
+#include "PbrAltPipeline.h"
 
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
@@ -109,7 +111,6 @@ struct LightSource {
 
 class VulkanRenderer {
 public:
-  VulkanRenderer():camera(0.0f,0.0f,10.0f) {};
   void run() {
     initWindow();
     initVulkan();
@@ -195,31 +196,10 @@ private:
 
   VkDescriptorSetLayout modelDescriptorSetLayout;
   VkDescriptorSetLayout materialDescriptorSetLayout;
- 
-  struct {
-    std::vector<std::shared_ptr<Model>> models;
-    Pipeline pipeline;
-  } pbr_alt_textured;
 
-  struct {
-    std::vector<std::shared_ptr<Model>> models;
-    Pipeline pipeline;
-  } pbr_alt;
-
-  struct {
-    std::vector<std::shared_ptr<Model>> models;
-    Pipeline pipeline;
-  } pbr;
-
-  struct {
-    std::vector<std::shared_ptr<Model>> models;
-    Pipeline pipeline;
-  } pbr_textured;
-
-  struct {
-    std::vector<std::shared_ptr<Model>> models;
-    Pipeline pipeline;
-  } trad;
+  RenderingPipeline renderingPipeline;
+  PbrPipeline pbrPipeline;
+  PbrAltPipeline pbrAltPipeline;
 
   PBRMaps pbrMaps;
 
@@ -267,6 +247,7 @@ private:
 
     setupLights();
 
+    createDescriptorSetLayouts();
     loadModels();
 
     createBrdf();
@@ -561,24 +542,30 @@ private:
     //}
 
     skybox.cleanup();
+    if(renderingPipeline.valid())
+      renderingPipeline.cleanup();
+    if (pbrPipeline.valid())
+      pbrPipeline.cleanup();
+    if (pbrAltPipeline.valid())
+      pbrAltPipeline.cleanup();
 
-    if (pbr.models.size() > 0) {
-      for (auto& m : pbr.models)
-        m->cleanup();
-      pbr.pipeline.cleanup();
-    }
+    //if (pbr.models.size() > 0) {
+    //  for (auto& m : pbr.models)
+    //    m->cleanup();
+    //  pbr.pipeline.cleanup();
+    //}
 
-    if(pbr_alt.models.size() > 0){
-      for (auto& m : pbr_alt.models)
-        m->cleanup();
-      pbr_alt.pipeline.cleanup();
-    }
+    //if(pbr_alt.models.size() > 0){
+    //  for (auto& m : pbr_alt.models)
+    //    m->cleanup();
+    //  pbr_alt.pipeline.cleanup();
+    //}
 
-    if (trad.models.size() > 0) {
-      for (auto& m : trad.models)
-        m->cleanup();
-      trad.pipeline.cleanup();
-    }
+    //if (trad.models.size() > 0) {
+    //  for (auto& m : trad.models)
+    //    m->cleanup();
+    //  trad.pipeline.cleanup();
+    //}
 
     vkDestroyDescriptorSetLayout(device.device, materialDescriptorSetLayout, nullptr);
     vkDestroyDescriptorSetLayout(device.device, modelDescriptorSetLayout, nullptr);
@@ -848,23 +835,6 @@ private:
     dependencies[1].dstAccessMask = 0;
     dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-    //std::array<VkSubpassDependency, 1> dependencies;
-    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    //dependencies[0].dstSubpass = 0;
-    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    //dependencies[0].srcAccessMask = 0;
-    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    //std::array<VkSubpassDependency, 1> dependencies;
-    //dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    //dependencies[0].dstSubpass = 0;
-    //dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    //dependencies[0].srcAccessMask = 0;
-    //dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    //dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    //dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
     std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -895,9 +865,7 @@ private:
     skybox.model = m;
 
     skybox.device = &device;
-    //skybox.texture.loadHdr("envmaps/001.hdr", 2048, &skybox.model);
     skybox.loadHdr("skybox/Newport_Loft_Ref.hdr", 1024);
-    //skybox.texture.loadHdr("envmaps/studio_small_03_2k.hdr", 2048, skybox.model);
 
     Pipeline p{};
     p.device = &device;
@@ -909,30 +877,6 @@ private:
     p.msaaSamples = msaaSamples;
     p.createGraphicsPipeline("compiledshaders/skybox.vert.spv", "compiledshaders/skybox.frag.spv");
     skybox.pipeline = p;
-    
-
-    //skybox.model.device = &device;
-    //skybox.model.swapChainSize = 1;
-    //skybox.model.loadModel("skybox/cube.obj");
-    //skybox.model.createDescriptorBuffers();
-    ////skybox.model.createDescriptorSetLayout();
-    //skybox.model.descriptorSetLayout = modelDescriptorSetLayout;
-    //skybox.model.createDescriptorSets();
-
-    //skybox.device = &device;
-    ////skybox.texture.loadHdr("envmaps/001.hdr", 2048, &skybox.model);
-    //skybox.loadHdr("Newport_loft/Newport_Loft_Ref.hdr", 1024, &skybox.model);
-    ////skybox.texture.loadHdr("envmaps/studio_small_03_2k.hdr", 2048, skybox.model);
-
-
-    //skybox.pipeline.device = &device;
-    //skybox.pipeline.descriptorSetLayouts.push_back(skybox.model.descriptorSetLayout);
-    //skybox.pipeline.descriptorSetLayouts.push_back(skybox.texture.skyboxDescriptorSetLayout);
-    //skybox.pipeline.swapChainExtent = swapChainExtent;
-    //skybox.pipeline.renderPass = renderPass;
-    //skybox.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-    //skybox.pipeline.msaaSamples = msaaSamples;
-    //skybox.pipeline.createGraphicsPipeline("compiledshaders/skybox.vert.spv", "compiledshaders/skybox.frag.spv");
 
   }
 
@@ -1106,19 +1050,7 @@ private:
 
   }
 
-  void loadModels() {
-    std::array<glm::vec4, 10> positions = {
-      glm::vec4(0.0f,0.0f,0.0f,1.0f),
-      glm::vec4(-2.0f,2.0f, 0.0f,1.0f),
-      glm::vec4(-2.0f,4.0f, 0.0f,1.0f),
-      glm::vec4(-2.0f, 6.0f, 0.0f,1.0f),
-      glm::vec4(2.0f,2.0f,0.0f,1.0f),
-      glm::vec4(2.0f,4.0f,0.0f,1.0f),
-      glm::vec4(2.0f,6.0f, 0.0f,1.0f),
-      glm::vec4(0.0f, 5.0f,0.0f,1.0f),
-      glm::vec4(0.0f,0.0f,0.0f,0.1f),
-      glm::vec4(5.0f,5.0f,1.0f,0.1f),
-    };
+  void createDescriptorSetLayouts() {
     {
       VkDescriptorSetLayoutBinding materialLayoutBinding{};
       materialLayoutBinding.binding = 0;
@@ -1206,6 +1138,21 @@ private:
         throw std::runtime_error("failed to create descriptor set layout!");
       }
     }
+  }
+
+  void loadModels() {
+    std::array<glm::vec4, 10> positions = {
+      glm::vec4(0.0f,0.0f,0.0f,1.0f),
+      glm::vec4(-2.0f,2.0f, 0.0f,1.0f),
+      glm::vec4(-2.0f,4.0f, 0.0f,1.0f),
+      glm::vec4(-2.0f, 6.0f, 0.0f,1.0f),
+      glm::vec4(2.0f,2.0f,0.0f,1.0f),
+      glm::vec4(2.0f,4.0f,0.0f,1.0f),
+      glm::vec4(2.0f,6.0f, 0.0f,1.0f),
+      glm::vec4(0.0f, 5.0f,0.0f,1.0f),
+      glm::vec4(0.0f,0.0f,0.0f,0.1f),
+      glm::vec4(5.0f,5.0f,1.0f,0.1f),
+    };
     int posIndx = 0;
     //non-material models
     //for (auto& pair : MODEL_PATH) {
@@ -1225,7 +1172,7 @@ private:
       m->materialDescriptorSetLayout = materialDescriptorSetLayout;
       m->createMaterialBuffers();
       m->name += std::to_string(posIndx);
-      trad.models.push_back(m);
+      renderingPipeline.models.push_back(m);
       models.push_back(m);
       posIndx++;
     }
@@ -1250,34 +1197,11 @@ private:
       
       m->createMaterialBuffers();
       m->name += "_world_"+std::to_string(posIndx);
-      pbr.models.push_back(m);
+      pbrPipeline.models.push_back(m);
       models.push_back(m);
       posIndx++;
       //models.push_back(&pbr.models.back());
     }
-    //{
-    //  auto path = "models/skull/craneo.obj";
-    //  std::cout << path << std::endl;
-    //  auto m = std::make_shared<Model>();
-    //  //Model m;
-    //  m->device = &device;
-    //  m->swapChainSize = swapChainImages.size();
-    //  m->loadModel(path);
-    //  m->modelPos[3] = glm::vec4(3.0f, 0.0f, 0.0f, 1.0f);
-    //  //m->modelPos = glm::rotate(m->modelPos, glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
-    //  //m->createDescriptorSetLayout();
-    //  m->descriptorSetLayout = modelDescriptorSetLayout;
-    //  m->materialDescriptorSetLayout = materialDescriptorSetLayout;
-
-    //  m->createDescriptorBuffers();
-    //  m->createDescriptorSets();
-
-    //  m->createMaterialBuffers();
-    //  m->name += "_world_" + std::to_string(posIndx);
-    //  pbr.models.push_back(m);
-    //  models.push_back(m);
-    //  //posIndx++;
-    //}
     {
       auto path = "models/platform/platform2.obj";
       std::cout << path << std::endl;
@@ -1299,8 +1223,8 @@ private:
       m->createDescriptorSets();
 
       m->createMaterialBuffers();
-      m->name += "_world_" + std::to_string(posIndx);
-      pbr.models.push_back(m);
+      m->name += "_pbr_" + std::to_string(posIndx);
+      pbrPipeline.models.push_back(m);
       models.push_back(m);
       //posIndx++;
     }
@@ -1323,8 +1247,8 @@ private:
       m->createDescriptorSets();
 
       m->createMaterialBuffers();
-      m->name += "_tangent_" + std::to_string(posIndx);
-      pbr_alt.models.push_back(m);
+      m->name += "_pbrAlt_" + std::to_string(posIndx);
+      pbrAltPipeline.models.push_back(m);
       models.push_back(m);
       posIndx++;
       //models.push_back(&pbr.models.back());
@@ -1339,124 +1263,59 @@ private:
 
   void createGraphicsPipelines() {
     //textured models
-    if(trad.models.size() > 0)
+    if(renderingPipeline.valid())
     {
-      trad.pipeline.device = &device;
-      trad.pipeline.swapChainExtent = swapChainExtent;
-      trad.pipeline.renderPass = renderPass;
-      trad.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-      trad.pipeline.msaaSamples = msaaSamples;
-      trad.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
+      renderingPipeline.device = &device;
+      renderingPipeline.swapChainExtent = swapChainExtent;
+      renderingPipeline.renderPass = renderPass;
+      renderingPipeline.pushConstantSize = sizeof(UniformBufferObject);
+      renderingPipeline.msaaSamples = msaaSamples;
+      renderingPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
      
-      trad.pipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
-      trad.pipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
+      renderingPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
+      renderingPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
       
-      //trad.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-      trad.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-      trad.pipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/shader.frag.spv");
+      //renderingPipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
+      renderingPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
+      renderingPipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/shader.frag.spv");
     }
 
     //MATERIAL MODELS
-    if(pbr.models.size() > 0)
+    if(pbrPipeline.valid())
     {
-      pbr.pipeline.device = &device;
-      pbr.pipeline.swapChainExtent = swapChainExtent;
-      pbr.pipeline.renderPass = renderPass;
-      pbr.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-      pbr.pipeline.msaaSamples = msaaSamples;
-      pbr.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
+      pbrPipeline.device = &device;
+      pbrPipeline.swapChainExtent = swapChainExtent;
+      pbrPipeline.renderPass = renderPass;
+      pbrPipeline.pushConstantSize = sizeof(UniformBufferObject);
+      pbrPipeline.msaaSamples = msaaSamples;
+      pbrPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
 
-      pbr.pipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
-      pbr.pipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
+      pbrPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
+      pbrPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
 
-      //pbr.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-      pbr.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-      pbr.pipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
-      //pbr.pipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
-      //pbr.pipeline.createGraphicsPipeline("compiledshaders/shader.vert.spv", "compiledshaders/pbr_alt_world.frag.spv");
-      pbr.pipeline.createGraphicsPipeline("compiledshaders/shader.world.vert.spv", "compiledshaders/pbr_world.frag.spv");
+      pbrPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
+      pbrPipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
+
+      pbrPipeline.createGraphicsPipeline("compiledshaders/shader.world.vert.spv", "compiledshaders/pbr_world.frag.spv");
     }
-    if (pbr_alt.models.size() > 0) {
-      
-      pbr_alt.pipeline.device = &device;
-      pbr_alt.pipeline.swapChainExtent = swapChainExtent;
-      pbr_alt.pipeline.renderPass = renderPass;
-      pbr_alt.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-      pbr_alt.pipeline.msaaSamples = msaaSamples;
-      pbr_alt.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
+    if (pbrAltPipeline.valid())
+    {
+      pbrAltPipeline.device = &device;
+      pbrAltPipeline.swapChainExtent = swapChainExtent;
+      pbrAltPipeline.renderPass = renderPass;
+      pbrAltPipeline.pushConstantSize = sizeof(UniformBufferObject);
+      pbrAltPipeline.msaaSamples = msaaSamples;
+      pbrAltPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
 
-      pbr_alt.pipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
-      pbr_alt.pipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
+      pbrAltPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
+      pbrAltPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
 
-      //pbr_alt.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-      pbr_alt.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-      pbr_alt.pipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
-      //pbr_alt.pipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
-      //pbr_alt.pipeline.createGraphicsPipeline("compiledshaders/shader.vert.spv", "compiledshaders/pbr_alt_tangent.frag.spv");
-      pbr_alt.pipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/pbr_tangent.frag.spv");
+      pbrAltPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
+      pbrAltPipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
+      pbrAltPipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
+
+      pbrAltPipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/pbr_alt_tangent.frag.spv");
     }
-
-    ////Textured MATERIAL MODELS
-    //if(pbr_textured.models.size() > 0)
-    //{
-    //  pbr_textured.pipeline.device = &device;
-    //  pbr_textured.pipeline.swapChainExtent = swapChainExtent;
-    //  pbr_textured.pipeline.renderPass = renderPass;
-    //  pbr_textured.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-    //  pbr_textured.pipeline.msaaSamples = msaaSamples;
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
-
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(pbr_textured.models[0]->descriptorSetLayout);
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(pbr_textured.models[0]->materialDescriptorSetLayout);
-
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-    //  pbr_textured.pipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
-
-    //  pbr_textured.pipeline.createGraphicsPipeline("compiledshaders/pbr.vert.spv", "compiledshaders/pbr_textured.frag.spv");
-    //}
-
-    ////ALT MATERIAL MODELS
-    //if(pbr_alt.models.size() > 0)
-    //{
-    //  pbr_alt.pipeline.device = &device;
-    //  pbr_alt.pipeline.swapChainExtent = swapChainExtent;
-    //  pbr_alt.pipeline.renderPass = renderPass;
-    //  pbr_alt.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-    //  pbr_alt.pipeline.msaaSamples = msaaSamples;
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
-
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(pbr_alt.models[0]->descriptorSetLayout);
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(pbr_alt.models[0]->materialDescriptorSetLayout);
-
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
-    //  pbr_alt.pipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
-
-    //  pbr_alt.pipeline.createGraphicsPipeline("compiledshaders/pbr_alt.vert.spv", "compiledshaders/pbr_alt.frag.spv");
-    //}
-
-    ////Textured MATERIAL MODELS
-    //if (pbr_alt_textured.models.size() > 0)
-    //{
-    //  pbr_alt_textured.pipeline.device = &device;
-    //  pbr_alt_textured.pipeline.swapChainExtent = swapChainExtent;
-    //  pbr_alt_textured.pipeline.renderPass = renderPass;
-    //  pbr_alt_textured.pipeline.pushConstantSize = sizeof(UniformBufferObject);
-    //  pbr_alt_textured.pipeline.msaaSamples = msaaSamples;
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
-
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(pbr_alt_textured.models[0]->descriptorSetLayout);
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(pbr_alt_textured.models[0]->materialDescriptorSetLayout);
-
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
-    //  pbr_alt_textured.pipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
-
-    //  pbr_alt_textured.pipeline.createGraphicsPipeline("compiledshaders/pbr_alt.vert.spv", "compiledshaders/pbr_alt_textured.frag.spv");
-    //}
 
   }
 
@@ -1702,45 +1561,20 @@ private:
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         //Non-pbr models
-        if(trad.models.size() > 0)
+        std::vector<VkDescriptorSet*> descriptors = {&lightDescriptor,&shadowCubeMap.shadowDescriptorSet[i]};
+        if(renderingPipeline.valid())
         {
-          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.graphicsPipeline);
-          
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
-          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 3, 1, &shadowCubeMap.shadowDescriptorSet[i], 0, nullptr);
-        
-          for(auto& model: trad.models){
-            model->draw(commandBuffers[i], trad.pipeline.pipelineLayout, i);
-          }
+          renderingPipeline.draw(commandBuffers[i], descriptors, i);
         }
-
+        descriptors.push_back(&pbrMaps.descriptorSet);
         //PBR models
-        if (pbr.models.size() > 0)
+        if (pbrPipeline.valid())
         {
-          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.graphicsPipeline);
-
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
-          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 3, 1, &shadowCubeMap.shadowDescriptorSet[i], 0, nullptr);
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 4, 1, &pbrMaps.descriptorSet, 0, nullptr);          
-          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr.pipeline.pipelineLayout, 6, 1, &brdfTexture.descriptorSet, 0, nullptr);
-          for (auto& model : pbr.models) {
-            model->draw(commandBuffers[i], pbr.pipeline.pipelineLayout, i);
-          }
+          pbrPipeline.draw(commandBuffers[i], descriptors, i);
         }
-        if (pbr_alt.models.size() > 0) {
-          
-          vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.graphicsPipeline);
-
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.pipelineLayout, 0, 1, &lightDescriptor, 0, nullptr);
-          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.pipelineLayout, 3, 1, &shadowCubeMap.shadowDescriptorSet[i], 0, nullptr);
-          vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.pipelineLayout, 4, 1, &pbrMaps.descriptorSet, 0, nullptr);
-          //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pbr_alt.pipeline.pipelineLayout, 6, 1, &brdfTexture.descriptorSet, 0, nullptr);
-          for (auto& model : pbr_alt.models) {
-            model->draw(commandBuffers[i], pbr_alt.pipeline.pipelineLayout, i);
-          }
+        descriptors.push_back(&brdfTexture.descriptorSet);
+        if (pbrAltPipeline.valid()) {
+          pbrAltPipeline.draw(commandBuffers[i], descriptors, i);
         }
 
         skybox.draw(commandBuffers[i]);
@@ -1863,7 +1697,7 @@ private:
         throw std::runtime_error("failed to create psuch constant command buffer!");
       }
     }
-    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], pbr.pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstant);
+    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], renderingPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstant);
     if (vkEndCommandBuffer(pushConstantCommandBuffers[imageIndex]) != VK_SUCCESS) {
       throw std::runtime_error("failed to end imgui command buffer!");
     }
