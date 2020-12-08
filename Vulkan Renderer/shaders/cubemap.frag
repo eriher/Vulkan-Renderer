@@ -7,12 +7,6 @@ vec2 SampleSphericalMap(vec3 v)
     uv *= invAtan;
     uv += 0.5;
     return uv;
-
-//  float theta = acos(max(-1.0f, min(1.0f, v.y)));
-//	float phi = atan(v.z, v.x);
-//	if (phi < 0.0f) phi = phi + 2.0f * PI;
-//	// Use these to lookup the color in the environment map
-//	return vec2(phi / (2.0 * PI), theta / PI);
 }
 
 layout (binding = 1) uniform sampler2D equirectangularMap;

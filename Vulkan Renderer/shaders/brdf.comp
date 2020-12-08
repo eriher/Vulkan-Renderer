@@ -112,8 +112,7 @@ void main() {
   //x-1 to match shader roughnes
   float x = 1.0f - (gl_GlobalInvocationID.x / 512.0f);
   float y = (gl_GlobalInvocationID.y / 512.0f);
-	vec4 res = vec4(IntegrateBRDF(x, y),vec2(0.0));
-
-	imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
+  vec4 res = vec4(IntegrateBRDF(x, y),vec2(0.0));
+  imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
 }
 
