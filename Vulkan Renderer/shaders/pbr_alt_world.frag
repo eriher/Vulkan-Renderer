@@ -1,6 +1,7 @@
 #version 450
 #define PI 3.14159265359
 #define EPSILON 0.015
+
 layout(set=0, binding = 0) uniform Light { 
 	vec4 position;
 	vec4 color;
@@ -36,28 +37,13 @@ layout(set=5, binding = 0) uniform sampler2D brdfLUT;
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 worldSpaceNormal; 
 layout(location = 2) in vec3 worldSpacePosition; 
-layout(location = 3) in vec3	worldSpaceCam;
+layout(location = 3) in vec3 worldSpaceCam;
 layout(location = 4) in mat3 TBN;
 layout(location = 8) in mat3 TTBN;
 
 layout(location = 0) out vec4 outColor;
 float heightScale = 0.1;
-vec3 getNormalFromMap(vec2 texCoords)
-{
-    vec3 tangentNormal = texture(normalMap, texCoords).xyz * 2.0 - 1.0;
 
-    vec3 Q1  = dFdx(worldSpacePosition);
-    vec3 Q2  = dFdy(worldSpacePosition);
-    vec2 st1 = dFdx(texCoords);
-    vec2 st2 = dFdy(texCoords);
-
-    vec3 N   = normalize(worldSpaceNormal);
-    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
-    vec3 B  = -normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
 // ----------------------------------------------------------------------------
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -106,43 +92,6 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 // ----------------------------------------------------------------------------
 
 vec2 parallaxMapping(vec2 texCoords, vec3 viewDir)
-{
-    float height = 1.0 - texture(depthMap, texCoords).r;
-    return texCoords - viewDir.xy * (height*heightScale);
-}
-
-vec2 steepParallaxMapping(vec2 texCoords, vec3 viewDir)
-{ 
-    // number of depth layers
-    const float minLayers = 8;
-    const float maxLayers = 32;
-    float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));  
-    // calculate the size of each layer
-    float layerDepth = 1.0 / numLayers;
-    // depth of current layer
-    float currentLayerDepth = 0.0;
-    // the amount to shift the texture coordinates per layer (from vector P)
-    vec2 P = viewDir.xy / viewDir.z * heightScale; 
-    vec2 deltaTexCoords = P / numLayers;
-  
-    // get initial values
-    vec2  currentTexCoords     = texCoords;
-    float currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;
-      
-    while(currentLayerDepth < currentDepthMapValue)
-    {
-        // shift texture coordinates along direction of P
-        currentTexCoords -= deltaTexCoords;
-        // get depthmap value at current texture coordinates
-        currentDepthMapValue =  1.0f - texture(depthMap, currentTexCoords).r;  
-        // get depth of next layer
-        currentLayerDepth += layerDepth;  
-    }
-    
-    return currentTexCoords;
-}
-
-vec2 occlusionParallaxMapping(vec2 texCoords, vec3 viewDir)
 { 
     // number of depth layers
     const float minLayers = 8;
@@ -219,18 +168,17 @@ float shadowPCF(vec3 sc)
 
 void main()
 {		
-    //vec3 cameraPos = (inverse(viewMatrix) * vec4(vec3(0.0),1.0)).xyz;
-    vec3 viewVec = worldSpaceCam - worldSpacePosition;
-	  vec3 V = normalize(viewVec);
+	  vec3 V = normalize(worldSpaceCam - worldSpacePosition);
 
     vec2 texCoords = fragTexCoord;
 
-    //texCoords.y = 1.0 - texCoords.y;
-
     if(textureSize(depthMap,0).x > 1){
-	    texCoords = occlusionParallaxMapping(texCoords, TTBN * V);
+	    texCoords = parallaxMapping(texCoords, TTBN * V);
      }
 
+    if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
+      discard;
+    
     vec3 N = normalize(worldSpaceNormal);
     if(textureSize(normalMap,0).x > 1){
       N = (texture(normalMap, texCoords).xyz * 2.0 - 1.0);
@@ -238,15 +186,10 @@ void main()
     }
 
     vec3 albedo;
-    if(textureSize(colorMap,0).x > 1){
+    if(textureSize(colorMap,0).x > 1)
 	    albedo = pow(texture(colorMap, texCoords).rgb,vec3(2.2));
-      }
     else
 	    albedo = m.color.rgb;
-
-
-    if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
-      discard;
 
     vec3 emission_term;
     if(textureSize(emissionMap,0).x > 1)
@@ -278,48 +221,43 @@ void main()
     F0 = mix(F0, albedo, metal);
 
     // reflectance equation
-    vec3 Lo = vec3(0.0);
+    vec3 direct_illumination_term = vec3(0.0);
     for(int i = 0; i < 1; ++i) 
     {
         // calculate per-light radiance
         vec3 lightVec = light.position.xyz - worldSpacePosition;
         vec3 L = normalize(lightVec);
-        vec3 H = normalize(V + L);
-        float lightDistance = length(lightVec);
-        float attenuation = 1.0 / (lightDistance * lightDistance);
-        vec3 radiance = light.intensity * light.color.rgb * attenuation;
-        float NdotL = max(dot(N, L), 0.0);   
-        //if(NdotL > 0){
-          float closestDepth = texture(shadowCubeMap, -L).x;
-          float shadow = 0.0;
-          if(lightDistance > closestDepth)
-            shadow = shadowPCF(-lightVec);
-          // Cook-Torrance BRDF
-          float NDF = DistributionGGX(N, H, roughness);   
-          float G   = GeometrySmith(N, V, L, roughness);    
-          vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
-        
-          vec3 nominator    = NDF * G * F;
-          float denominator = 4 * max(dot(N, V), 0.0) * NdotL + 0.001; // 0.001 to prevent divide by zero.
-          vec3 specular = nominator / denominator;
-        
-           // kS is equal to Fresnel
-          vec3 kS = F;
-          // for energy conservation, the diffuse and specular light can't
-          // be above 1.0 (unless the surface emits light); to preserve this
-          // relationship the diffuse component (kD) should equal 1.0 - kS.
-          vec3 kD = vec3(1.0) - kS;
-          // multiply kD by the inverse metalness such that only non-metals 
-          // have diffuse lighting, or a linear blend if partly metal (pure metals
-          // have no diffuse light).
-          kD *= 1.0 - metal;
-            
-          // scale light by NdotL
-          //float NdotL = max(dot(N, L), 0.00);        
+        float lightDirection = dot(L, N);
+        if(lightDirection > 0){
+          float shadow = shadowPCF(-lightVec);
+          if(shadow < 0.99){
+            vec3 H = normalize(V + L);
+            vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
 
-          // add to outgoing radiance Lo
-          Lo += (kD * albedo / PI + specular) * radiance * NdotL * (1.0 - shadow);
-        //}
+            // Cook-Torrance BRDF
+            float NDF = DistributionGGX(N, H, roughness);   
+            float G   = GeometrySmith(N, V, L, roughness);    
+            vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
+          
+            vec3 nominator    = NDF * G * F;
+            float denominator = 4 * max(dot(N, V), 0.0) * lightDirection + 0.001; // 0.001 to prevent divide by zero.
+            vec3 specular = nominator / denominator;
+          
+            // kS is equal to Fresnel
+            vec3 kS = F;
+            // for energy conservation, the diffuse and specular light can't
+            // be above 1.0 (unless the surface emits light); to preserve this
+            // relationship the diffuse component (kD) should equal 1.0 - kS.
+            vec3 kD = vec3(1.0) - kS;
+            // multiply kD by the inverse metalness such that only non-metals 
+            // have diffuse lighting, or a linear blend if partly metal (pure metals
+            // have no diffuse light).
+            kD *= 1.0 - metal;
+
+            // add to outgoing radiance
+            direct_illumination_term += (kD * albedo / PI + specular) * li * lightDirection * (1.0 - shadow);
+          }
+        }
     }   
     
     // ambient lighting (we now use IBL as the ambient term)
@@ -328,37 +266,25 @@ void main()
     vec3 kS = F;
     vec3 kD = 1.0 - kS;
     kD *= 1.0 - metal;
-    //Bring normal out of tangentspace
+
     vec3 irradiance = texture(irradianceMap,  N).rgb;
     vec3 diffuse      = irradiance * albedo;
     //vec3 diffuse = albedo * (1.0 / PI) * irradiance;
 
     vec3 R = reflect(-V, N);
+
     // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
     const float MAX_REFLECTION_LOD = 8.0;
-    //vec3 prefilteredColor = textureLod(reflectionMap, reflect(normalize(worldSpacePosition - (inverse(viewMatrix)*vec4(vec3(0.0),1.0)).xyz) ,normalize(worldSpaceNormal)),  roughness * MAX_REFLECTION_LOD).rgb;
+
     vec3 prefilteredColor = textureLod(reflectionMap, R, roughness * MAX_REFLECTION_LOD).rgb;
-    
     vec2 brdf  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
     vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
 
-    vec3 ambient = (kD * diffuse + specular) * ao;
+    vec3 indirect_illumination = (kD * diffuse + specular) * ao;
     
-    vec3 color = emission_term + ambient + Lo;
-
-    // HDR tonemapping
-    //color = color / (color + vec3(1.0));
-    // gamma correct
-    //color = pow(color, vec3(1.0/2.2)); 
-
-    //float exposure = 2.0f;
-    // exposure tone mapping
-    //color = vec3(1.0) - exp(-color * exposure);
-    // gamma correction 
-    //mapped = pow(mapped, vec3(1.0 / gamma));
-		//color = color / (color + vec3(1.0));
+    vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
+    
     float exposure = 3.0f;
 		color = vec3(1.0) - exp(-color * exposure);
-
     outColor = vec4(specular, 1.0);
 }

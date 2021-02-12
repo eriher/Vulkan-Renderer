@@ -47,7 +47,7 @@
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
-const std::array<std::string, 1> MODEL_PATH = { "models/skull/craneo.obj" };
+const std::array<std::string, 1> MODEL_PATH = { "models/bricks/quad.obj"/*"models/scifi/cube.obj"*/ };
 //const std::array<std::string, 2> MODEL_PATH = {
 //  "models/redBricks/sphere.obj",
 //  "models/bricks/quad.obj"
@@ -56,8 +56,8 @@ const std::array<std::string, 1> MODEL_PATH = { "models/skull/craneo.obj" };
 //const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/NewShip.obj" };
 
 //const std::array<std::string, 2> MATERIAL_MODEL_PATH = {  /*"models/rustedSphere/sphere.obj", */"models/scifi/cube.obj", "models/bricks/cube.obj" };
-const std::array<std::string, 1> MATERIAL_MODEL_PATH = {  /*"models/rustedSphere/sphere.obj", "models/scifi/cube.obj" */ /*"models/skull/craneo.obj",*/ "models/scifi/cube.obj"/*, "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
-const std::array<std::string, 0> MATERIAL_ALT_MODEL_PATH = { /*"models/scifi/cube.obj", "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
+const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/rustedSphere/sphere.obj"/*, "models/scifi/cube.obj" */ /*"models/skull/craneo.obj", "models/scifi/cube.obj", "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
+const std::array<std::string, 1> MATERIAL_ALT_MODEL_PATH = { "models/rustedSphere/sphere.obj"/*"models/bricks/quad.obj"/*"models/scifi/cube.obj"/*, "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char*> validationLayers = {
@@ -125,7 +125,7 @@ private:
   VkDebugUtilsMessengerEXT debugMessenger;
   VkSurfaceKHR surface;
 
-  VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_2_BIT;
+  VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_8_BIT;
 
   Camera camera;
 
@@ -1143,8 +1143,8 @@ private:
   void loadModels() {
     std::array<glm::vec4, 10> positions = {
       glm::vec4(0.0f,0.0f,0.0f,1.0f),
-      glm::vec4(-2.0f,2.0f, 0.0f,1.0f),
-      glm::vec4(-2.0f,4.0f, 0.0f,1.0f),
+      glm::vec4(2.0f,0.0f, 0.0f,1.0f),
+      glm::vec4(-2.0f,0.0f, 0.0f,1.0f),
       glm::vec4(-2.0f, 6.0f, 0.0f,1.0f),
       glm::vec4(2.0f,2.0f,0.0f,1.0f),
       glm::vec4(2.0f,4.0f,0.0f,1.0f),
@@ -1202,33 +1202,7 @@ private:
       posIndx++;
       //models.push_back(&pbr.models.back());
     }
-    {
-      auto path = "models/platform/platform2.obj";
-      std::cout << path << std::endl;
-      auto m = std::make_shared<Model>();
-      //Model m;
-      m->device = &device;
-      m->swapChainSize = swapChainImages.size();
-      m->loadModel(path);
-      m->modelPos = glm::scale(m->modelPos, glm::vec3(50.0f, 50.0f, 50.0f));
-      m->modelPos = glm::translate(m->modelPos, glm::vec3(0.0f, -0.3f, 0.0f));
-      //m->modelPos[3] = glm::vec4(0.0f, -5.0f, 0.0f, 1.0f);
-      //m->modelPos = glm::scale(m->modelPos, glm::vec3(1.0f, 1.0f, 1.0f));
-      //m->modelPos = glm::rotate(m->modelPos, glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
-      //m->createDescriptorSetLayout();
-      m->descriptorSetLayout = modelDescriptorSetLayout;
-      m->materialDescriptorSetLayout = materialDescriptorSetLayout;
-
-      m->createDescriptorBuffers();
-      m->createDescriptorSets();
-
-      m->createMaterialBuffers();
-      m->name += "_pbr_" + std::to_string(posIndx);
-      pbrPipeline.models.push_back(m);
-      models.push_back(m);
-      //posIndx++;
-    }
-
+    
 
     for (auto& path : MATERIAL_ALT_MODEL_PATH) {
       std::cout << path << std::endl;
@@ -1252,6 +1226,35 @@ private:
       models.push_back(m);
       posIndx++;
       //models.push_back(&pbr.models.back());
+    }
+
+
+
+    {
+      auto path = "models/platform/platform2.obj";
+      std::cout << path << std::endl;
+      auto m = std::make_shared<Model>();
+      //Model m;
+      m->device = &device;
+      m->swapChainSize = swapChainImages.size();
+      m->loadModel(path);
+      m->modelPos = glm::scale(m->modelPos, glm::vec3(50.0f, 50.0f, 50.0f));
+      m->modelPos = glm::translate(m->modelPos, glm::vec3(0.0f, -0.3f, 0.0f));
+      //m->modelPos[3] = glm::vec4(0.0f, -5.0f, 0.0f, 1.0f);
+      //m->modelPos = glm::scale(m->modelPos, glm::vec3(1.0f, 1.0f, 1.0f));
+      //m->modelPos = glm::rotate(m->modelPos, glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
+      //m->createDescriptorSetLayout();
+      m->descriptorSetLayout = modelDescriptorSetLayout;
+      m->materialDescriptorSetLayout = materialDescriptorSetLayout;
+
+      m->createDescriptorBuffers();
+      m->createDescriptorSets();
+
+      m->createMaterialBuffers();
+      m->name += "_pbr_" + std::to_string(posIndx);
+      pbrAltPipeline.models.push_back(m);
+      models.push_back(m);
+      //posIndx++;
     }
 
 
@@ -1296,7 +1299,7 @@ private:
       pbrPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
       pbrPipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
 
-      pbrPipeline.createGraphicsPipeline("compiledshaders/shader.world.vert.spv", "compiledshaders/pbr_world.frag.spv");
+      pbrPipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/pbr_tangent.frag.spv");
     }
     if (pbrAltPipeline.valid())
     {

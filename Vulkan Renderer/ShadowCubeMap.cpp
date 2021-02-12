@@ -81,7 +81,7 @@ void ShadowCubeMap::setupShadowMap(glm::vec4 *lightPos, std::vector<std::shared_
   }
 
 
-  //BELOW FOR THE IMAGE TO BE SAMPELED FROM
+  //THE IMAGE TO BE SAMPELED FROM
 
   VkSamplerCreateInfo samplerInfo{};
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

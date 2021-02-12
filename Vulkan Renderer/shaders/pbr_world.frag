@@ -35,7 +35,7 @@ layout(set=4, binding = 1) uniform samplerCube reflectionMap;
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 worldSpaceNormal; 
 layout(location = 2) in vec3 worldSpacePosition; 
-layout(location = 3) in vec3	worldSpaceCam;
+layout(location = 3) in vec3 worldSpaceCam;
 layout(location = 4) in mat3 TBN;
 layout(location = 8) in mat3 TTBN;
 
@@ -43,10 +43,10 @@ layout(location = 0) out vec4 outColor;
 
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
 { 
-		// number of depth layers
-		const float minLayers = 8.0;
-		const float maxLayers = 64.0;
-		float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+	// number of depth layers
+	const float minLayers = 8.0;
+	const float maxLayers = 64.0;
+	float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
     // calculate the size of each layer
     float layerDepth = 1.0 / numLayers;
     // depth of current layer
@@ -55,34 +55,32 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
     vec2 P = viewDir.xy * 0.1; 
     vec2 deltaTexCoords = P / numLayers;
 
-		// get initial values
-		vec2  currentTexCoords     = texCoords;
-		float currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;
-  
-		while(currentLayerDepth < currentDepthMapValue)
-		{
-				// shift texture coordinates along direction of P
-				currentTexCoords -= deltaTexCoords;
-				// get depthmap value at current texture coordinates
-				currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;  
-				// get depth of next layer
-				currentLayerDepth += layerDepth;  
-		}
+	// get initial values
+	vec2  currentTexCoords     = texCoords;
+	float currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;
 
-		// get texture coordinates before collision (reverse operations)
-		vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+	while(currentLayerDepth < currentDepthMapValue)
+	{
+		// shift texture coordinates along direction of P
+		currentTexCoords -= deltaTexCoords;
+		// get depthmap value at current texture coordinates
+		currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;  
+		// get depth of next layer
+		currentLayerDepth += layerDepth;  
+	}
 
-		// get depth after and before collision for linear interpolation
-		float afterDepth  = currentDepthMapValue - currentLayerDepth;
-		float beforeDepth = 1.0f - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
- 
-		// interpolation of texture coordinates
-		float weight = afterDepth / (afterDepth - beforeDepth);
-		vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+	// get texture coordinates before collision (reverse operations)
+	vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
 
-		return finalTexCoords;  
+	// get depth after and before collision for linear interpolation
+	float afterDepth  = currentDepthMapValue - currentLayerDepth;
+	float beforeDepth = 1.0f - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
 
-		//return currentTexCoords;
+	// interpolation of texture coordinates
+	float weight = afterDepth / (afterDepth - beforeDepth);
+	vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+	return finalTexCoords;  
 } 
 
 
@@ -107,9 +105,9 @@ float shadowPCF(vec3 sc)
 	//diskRadius = 0.1;
 	for(int i = 0; i < samples; ++i)
 	{
-			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
-			if(currentDepth > closestDepth + EPSILON)
-					shadow += 1.0;
+		float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
+		if(currentDepth > closestDepth + EPSILON)
+				shadow += 1.0;
 	}
 	shadow /= float(samples);  
 	return shadow;
@@ -117,14 +115,15 @@ float shadowPCF(vec3 sc)
 
 void main() {
 
-	  vec3 V = normalize(worldSpaceCam - worldSpacePosition);
+	vec3 V = normalize(worldSpaceCam - worldSpacePosition);
 
     vec2 texCoords = fragTexCoord;
-    if(textureSize(depthMap,0).x > 1)
-	    texCoords = ParallaxMapping(texCoords,TTBN*V);
 
-	  if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
-      discard;
+  	if(textureSize(depthMap,0).x > 1)
+		texCoords = ParallaxMapping(texCoords,V);
+
+	if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
+		discard;
 
     vec3 N = normalize(worldSpaceNormal);
     if(textureSize(normalMap,0).x > 1){
@@ -164,29 +163,29 @@ void main() {
 	
 	vec3 direct_illumination_term = vec3(0.0);
 	
-{
+	{
 		vec3 lightVec = light.position.xyz - worldSpacePosition;
-		vec3 wi = normalize(lightVec);
-		vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
-		float lightDirection = dot(wi, N);
+		vec3 L = normalize(lightVec);
+		float lightDirection = dot(L, N);
 		if(lightDirection > 0){
-			vec3 diffuse_term = albedo * (1/PI) * lightDirection * li;
-			float closestDepth = texture(shadowCubeMap, -li).x;
-			float shadow = 0.0;
-			//if(length(lightVec) > closestDepth)
-				shadow = shadowPCF(-lightVec);
-			vec3 wh = normalize(wi + V);
-			float s = m.shininess;
-			float f = m.fresnel + (1.0 - m.fresnel)*pow(1 - dot(wh,wi),5.0);
-			float d = (s+2.0)/(2.0*PI) * pow(dot(N,wh),s);
-			float NDwo = dot(N,V);
-			float g = min(1.0, 2.0*dot(N,wh)/dot(V,wh) * min(NDwo,lightDirection));
-			float brdf = (f*d*g)/(4.0*NDwo*lightDirection);
+			float shadow = shadowPCF(-lightVec);
+			if(shadow < 0.99){
+				vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
+				vec3 diffuse_term = albedo * (1/PI) * lightDirection * li;
 
-			vec3 dielectric_term = brdf * dot(N, wi) * li + (1 - f) * diffuse_term;
-			vec3 metal_term = brdf * albedo * dot(N, wi) * li;
-			vec3 microfacet_term = metal * metal_term + (1 - metal) * dielectric_term;
-			direct_illumination_term = m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term * (1.0 - shadow);
+				vec3 wh = normalize(L + V);
+				float s = m.shininess;
+				float f = m.fresnel + (1.0 - m.fresnel)*pow(1 - dot(wh,L),5.0);
+				float d = (s+2.0)/(2.0*PI) * pow(dot(N,wh),s);
+				float NDwo = dot(N,V);
+				float g = min(1.0, 2.0*dot(N,wh)/dot(V,wh) * min(NDwo,lightDirection));
+				float brdf = (f*d*g)/(4.0*NDwo*lightDirection);
+
+				vec3 dielectric_term = brdf * dot(N, L) * li + (1 - f) * diffuse_term;
+				vec3 metal_term = brdf * albedo * dot(N, L) * li;
+				vec3 microfacet_term = metal * metal_term + (1 - metal) * dielectric_term;
+				direct_illumination_term = m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term * (1.0 - shadow);
+			}
 		}
 	}
 
@@ -200,9 +199,7 @@ void main() {
 	vec3 wi = reflect(-V, N);
 	vec3 wh = normalize(wi + V);
 	vec3 li = /*environment_multiplier **/ textureLod(reflectionMap, wi, roughness * 8.0).rgb;
-	//vec3 wi2 = normalize(reflect(TBN * -V, TBN * N));
-	//vec3 li = environment_multiplier * textureLod(reflectionMap, reflect(normalize(worldSpacePosition - (inverse(viewMatrix)*vec4(vec3(0.0),1.0)).xyz) ,normalize(worldSpaceNormal)), roughness * 8.0).xyz;
-	
+
 	float f = m.fresnel + (1 - m.fresnel)*pow((1 - dot(wi,wh)),5);
 	vec3 dielectric_term = f * li + (1 - f) * diffuse_term;
 	vec3 metal_term = f * albedo * li;
@@ -212,9 +209,8 @@ void main() {
 
 	vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
 
-  float exposure = 3.0f;
+  	float exposure = 3.0f;
 	color = vec3(1.0) - exp(-color * exposure);
-
 	outColor = vec4(color,1.0);
 
 }

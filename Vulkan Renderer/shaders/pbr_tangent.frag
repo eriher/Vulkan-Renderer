@@ -42,47 +42,46 @@ layout(location = 5) in mat3 TBN;
 
 layout(location = 0) out vec4 outColor;
 
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
+vec2 parallaxMapping(vec2 texCoords, vec3 viewDir)
 { 
-		// number of depth layers
-		const float minLayers = 8.0;
-		const float maxLayers = 32.0;
-		float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+    // number of depth layers
+    const float minLayers = 8;
+    const float maxLayers = 32;
+    float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));  
     // calculate the size of each layer
     float layerDepth = 1.0 / numLayers;
     // depth of current layer
     float currentLayerDepth = 0.0;
     // the amount to shift the texture coordinates per layer (from vector P)
-    vec2 P = viewDir.xy * 0.1; 
+    vec2 P = viewDir.xy / viewDir.z * 0.1; 
     vec2 deltaTexCoords = P / numLayers;
-
-		// get initial values
-		vec2  currentTexCoords     = texCoords;
-		float currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;
   
-		while(currentLayerDepth < currentDepthMapValue)
-		{
-				// shift texture coordinates along direction of P
-				currentTexCoords -= deltaTexCoords;
-				// get depthmap value at current texture coordinates
-				currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;  
-				// get depth of next layer
-				currentLayerDepth += layerDepth;  
-		}
+    // get initial values
+    vec2  currentTexCoords     = texCoords;
+    float currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;
+      
+    while(currentLayerDepth < currentDepthMapValue)
+    {
+        // shift texture coordinates along direction of P
+        currentTexCoords -= deltaTexCoords;
+        // get depthmap value at current texture coordinates
+        currentDepthMapValue = 1.0f - texture(depthMap, currentTexCoords).r;  
+        // get depth of next layer
+        currentLayerDepth += layerDepth;  
+    }
+    
+    // get texture coordinates before collision (reverse operations)
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
 
-		// get texture coordinates before collision (reverse operations)
-		vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
-
-		// get depth after and before collision for linear interpolation
-		float afterDepth  = currentDepthMapValue - currentLayerDepth;
-		float beforeDepth = 1.0f - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
+    // get depth after and before collision for linear interpolation
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = 1.0f - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
  
-		// interpolation of texture coordinates
-		float weight = afterDepth / (afterDepth - beforeDepth);
-		vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+    // interpolation of texture coordinates
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
 
-		return finalTexCoords;  
-
+    return finalTexCoords;
 } 
 
 
@@ -90,7 +89,7 @@ float shadowPCF(vec3 sc)
 {
 	float currentDepth = length(sc);
 
-	vec3 sampleOffsetDirections[20] = vec3[]
+  vec3 sampleOffsetDirections[20] = vec3[]
 	(
 		 vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
 		 vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
@@ -100,18 +99,20 @@ float shadowPCF(vec3 sc)
 	);   
 	
 	float shadow = 0.0;
-	float bias   = 0.015;
+  	float closestDepth = texture(shadowCubeMap, sc).r;
+	if(currentDepth > closestDepth + EPSILON)
+			shadow += 1.0;
 	int samples  = 20;
 	float viewDistance = length(sc);
 	float diskRadius = 0.01 + (viewDistance/100.0)/10;  
-	//diskRadius = 0.1;
+	//diskRadius = 0.01;
 	for(int i = 0; i < samples; ++i)
 	{
-			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i] * diskRadius).r;
+			float closestDepth = texture(shadowCubeMap, sc + sampleOffsetDirections[i%20] * diskRadius).r;
 			if(currentDepth > closestDepth + EPSILON)
 					shadow += 1.0;
 	}
-	shadow /= float(samples);  
+	shadow /= 1.0f+float(samples);  
 	return shadow;
 }
 
@@ -119,18 +120,18 @@ void main() {
 
 	vec3 V = normalize(tangentViewPos - tangentFragPos);
 
-  vec2 texCoords = fragTexCoord;
+  	vec2 texCoords = fragTexCoord;
 
-  if(textureSize(depthMap,0).x > 1)
-	  texCoords = ParallaxMapping(texCoords,V);
+  	if(textureSize(depthMap,0).x > 1)
+		texCoords = parallaxMapping(texCoords,V);
 
 	if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
 		discard;
 
-  vec3 N = normalize(tangentNormPos);
-  if(textureSize(normalMap,0).x > 1){
+	vec3 N = normalize(tangentNormPos);
+	if(textureSize(normalMap,0).x > 1){
 		N = normalize(texture(normalMap, texCoords).xyz * 2.0 - 1.0);
-  }
+	}
 
 	vec3 albedo;
 	if(textureSize(colorMap,0).x > 1)
@@ -163,31 +164,29 @@ void main() {
 		metal = m.metalness;
 	
 	vec3 direct_illumination_term = vec3(0.0);
-	
-{
+	{
 		vec3 lightVec = tangentLightPos - tangentFragPos;
-		vec3 wi = normalize(lightVec);
-		vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
-		float lightDirection = dot(wi, N);
+		vec3 L = normalize(lightVec);
+		float lightDirection = dot(L, N);
 		if(lightDirection > 0){
-			vec3 diffuse_term = albedo * (1/PI) * lightDirection * li;
-	    //float shadow = 0.0;
-      //float closestDepth = texture(shadowCubeMap, TBN * -li).x;
-      //if(length(lightVec) > closestDepth)
-      //  shadow = shadowPCF(-lightVec);
 			float shadow = shadowPCF(TBN * -lightVec);
-			vec3 wh = normalize(wi + V);
-			float s = m.shininess;
-			float f = m.fresnel + (1.0 - m.fresnel)*pow(1 - dot(wh,wi),5.0);
-			float d = (s+2.0)/(2.0*PI) * pow(dot(N,wh),s);
-			float NDwo = dot(N,V);
-			float g = min(1.0, 2.0*dot(N,wh)/dot(V,wh) * min(NDwo,lightDirection));
-			float brdf = (f*d*g)/(4.0*NDwo*lightDirection);
+			if(shadow < 0.99){
+				vec3 li =  light.intensity * light.color.xyz * (1/pow(length(lightVec),2.0));
+				vec3 diffuse_term = albedo * (1/PI) * lightDirection * li;
+				
+				vec3 wh = normalize(L + V);
+				float s = m.shininess;
+				float f = m.fresnel + (1.0 - m.fresnel)*pow(1 - dot(wh,L),5.0);
+				float d = (s+2.0)/(2.0*PI) * pow(dot(N,wh),s);
+				float NDwo = dot(N,V);
+				float g = min(1.0, 2.0*dot(N,wh)/dot(V,wh) * min(NDwo,lightDirection));
+				float brdf = (f*d*g)/(4.0*NDwo*lightDirection);
 
-			vec3 dielectric_term = brdf * dot(N, wi) * li + (1 - f) * diffuse_term;
-			vec3 metal_term = brdf * albedo * dot(N, wi) * li;
-			vec3 microfacet_term = metal * metal_term + (1 - metal) * dielectric_term;
-			direct_illumination_term = m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term * (1.0 - shadow);;
+				vec3 dielectric_term = brdf * dot(N, L) * li + (1 - f) * diffuse_term;
+				vec3 metal_term = brdf * albedo * dot(N, L) * li;
+				vec3 microfacet_term = metal * metal_term + (1 - metal) * dielectric_term;
+				direct_illumination_term = m.reflectivity * microfacet_term + (1 - m.reflectivity) * diffuse_term * (1.0 - shadow);
+			}
 		}
 	}
 
@@ -201,9 +200,7 @@ void main() {
 	vec3 wi = reflect(-V, N);
 	vec3 wh = normalize(wi + V);
 	vec3 li = /*environment_multiplier **/ textureLod(reflectionMap, normalize(TBN*wi), roughness * 8.0).rgb;
-	//vec3 wi2 = normalize(reflect(TBN * -V, TBN * N));
-	//vec3 li = environment_multiplier * textureLod(reflectionMap, reflect(normalize(worldSpacePosition - (inverse(viewMatrix)*vec4(vec3(0.0),1.0)).xyz) ,normalize(worldSpaceNormal)), roughness * 8.0).xyz;
-	
+
 	float f = m.fresnel + (1 - m.fresnel)*pow((1 - dot(wi,wh)),5);
 	vec3 dielectric_term = f * li + (1 - f) * diffuse_term;
 	vec3 metal_term = f * albedo * li;
@@ -213,7 +210,7 @@ void main() {
 
 	vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
 
-  float exposure = 3.0f;
+  	float exposure = 3.0f;
 	color = vec3(1.0) - exp(-color * exposure);
 	outColor = vec4(color,1.0);
 
