@@ -9,3 +9,5 @@ Vulkan based render based on https://vulkan-tutorial.com/ , https://learnopengl.
 * BRDF generation compute shader
 
 Will load materials if present otherwise parameters tunable from gui.
+
+![Speheres](/spheres.jpg)
