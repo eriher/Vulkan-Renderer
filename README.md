@@ -11,3 +11,5 @@ Vulkan based render based on https://vulkan-tutorial.com/ , https://learnopengl.
 Will load materials if present otherwise parameters tunable from gui.
 
 ![Speheres](/spheres.jpg)
+
+![Wheatley](/wheatley.jpg)
