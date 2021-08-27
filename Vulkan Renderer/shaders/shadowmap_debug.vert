@@ -1,11 +1,12 @@
 #version 450
 
-layout(push_constant) uniform UniformBufferObject {
-    mat4 view;
-    mat4 proj;
+layout(set=0, binding = 0) uniform UBO {
+  mat4 proj;
+  mat4 view[6];
+  vec4 lightPos;
 } ubo;
 
-layout(set=1, binding = 0) uniform Model {
+layout(set = 1, binding = 0) uniform Model {
   mat4 pos;
 } model;
 

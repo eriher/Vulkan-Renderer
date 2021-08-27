@@ -542,8 +542,8 @@ void ShadowCubeMap::createView(VkImage &image, VkImageView &view, VkFormat forma
 
 void ShadowCubeMap::updateRenderDescriptorSets() {
   glm::vec3 eye = *lightPos;
-  float near_plane = 1.0f, far_plane = 100.0f;
-
+  float near_plane = 0.1f;
+  float far_plane = 1024.0f;
   glm::mat4 proj = Tools::projection2(glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane));
 
   OffscreenUbo ubo = { proj,  {

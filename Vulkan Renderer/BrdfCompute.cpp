@@ -16,7 +16,6 @@ void BrdfCompute::gen() {
     imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.flags = VK_NULL_HANDLE;
 
     if (vkCreateImage(device->device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
       throw std::runtime_error("failed to create image!");

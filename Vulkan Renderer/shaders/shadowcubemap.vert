@@ -1,7 +1,7 @@
 #version 450
 #extension GL_EXT_multiview : enable
 
-layout(binding = 0) uniform UBO {
+layout(set=0, binding = 0) uniform UBO {
   mat4 proj;
   mat4 view[6];
   vec4 lightPos;
@@ -21,7 +21,6 @@ layout (location = 1) out vec3 outLightPos;
 void main() {
   gl_Position = ubo.proj * ubo.view[gl_ViewIndex] * model.pos * vec4(inPosition, 1.0);
   outPos = (model.pos * vec4(inPosition, 1.0)).xyz;
-  //outPos.y *= -1;
 	outLightPos = ubo.lightPos.xyz; 
 }
 

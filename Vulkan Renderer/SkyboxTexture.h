@@ -48,6 +48,6 @@ class SkyboxTexture
 		void createTextureSampler();
 		void createSkyboxDescriptors();
 		void cleanup();
-		void draw(VkCommandBuffer&);
+		void draw(VkCommandBuffer&, VkDescriptorSet&);
 };
 

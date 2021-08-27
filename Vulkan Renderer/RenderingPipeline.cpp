@@ -5,8 +5,9 @@ void RenderingPipeline::draw(VkCommandBuffer& cb, std::vector<VkDescriptorSet*> 
   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
   vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,pipelineLayout, 0, 1, descriptors[0], 0, nullptr);
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, descriptors[1], 0, nullptr);
   //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, trad.pipeline.pipelineLayout, 3, 1, &shadowMap.descriptor, 0, nullptr);
-  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 3, 1, descriptors[1], 0, nullptr);
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 4, 1, descriptors[2], 0, nullptr);
 
   for (auto& model : models) {
     model->draw(cb, pipelineLayout, i);
@@ -112,13 +113,6 @@ void RenderingPipeline::createGraphicsPipeline(std::string vertFilePath, std::st
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
   pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
-
-  VkPushConstantRange pushConstantRange{};
-  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  pushConstantRange.offset = 0;
-  pushConstantRange.size = pushConstantSize;
-  pipelineLayoutInfo.pushConstantRangeCount = 1;
-  pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
   if (vkCreatePipelineLayout(device->device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");

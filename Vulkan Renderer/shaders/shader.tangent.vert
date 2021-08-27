@@ -1,24 +1,21 @@
 #version 450
 
-layout(push_constant) uniform UniformBufferObject {
+layout(set=0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 camPos;
 } ubo;
 
-layout(set=0, binding = 0) uniform Light { 
+layout(set=1, binding = 0) uniform Light { 
 	vec4 position;
 	vec4 color;
 	float intensity;
 } light;
 
-layout(set=1, binding = 0) uniform Model {
+
+layout(set=2, binding = 0) uniform Model {
   mat4 pos;
 } model;
-
-layout(set=3, binding = 0) uniform LightView {
-  mat4 transform;
-} lightView;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;

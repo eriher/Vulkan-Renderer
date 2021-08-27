@@ -1,14 +1,14 @@
 #version 450
 
-layout(push_constant) uniform UniformBufferObject {
+layout(set=0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
+    vec3 camPos;
 } ubo;
 
-layout(set = 0, binding = 0) uniform Model {
+layout(set = 1, binding = 0) uniform Model {
   mat4 pos;
 } model;
-
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;

@@ -47,7 +47,7 @@
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
-const std::array<std::string, 1> MODEL_PATH = { "models/bricks/quad.obj"/*"models/scifi/cube.obj"*/ };
+const std::array<std::string, 0> MODEL_PATH = { "models/bricks/quad.obj"/*"models/scifi/cube.obj"*/ };
 //const std::array<std::string, 2> MODEL_PATH = {
 //  "models/redBricks/sphere.obj",
 //  "models/bricks/quad.obj"
@@ -56,8 +56,8 @@ const std::array<std::string, 1> MODEL_PATH = { "models/bricks/quad.obj"/*"model
 //const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/NewShip.obj" };
 
 //const std::array<std::string, 2> MATERIAL_MODEL_PATH = {  /*"models/rustedSphere/sphere.obj", */"models/scifi/cube.obj", "models/bricks/cube.obj" };
-const std::array<std::string, 1> MATERIAL_MODEL_PATH = { "models/rustedSphere/sphere.obj"/*, "models/scifi/cube.obj" */ /*"models/skull/craneo.obj", "models/scifi/cube.obj", "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
-const std::array<std::string, 1> MATERIAL_ALT_MODEL_PATH = { "models/rustedSphere/sphere.obj"/*"models/bricks/quad.obj"/*"models/scifi/cube.obj"/*, "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
+const std::array<std::string, 0> MATERIAL_MODEL_PATH = { "models/rustedSphere/sphere.obj"/*, "models/scifi/cube.obj" */ /*"models/skull/craneo.obj", "models/scifi/cube.obj", "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
+const std::array<std::string, 1> MATERIAL_ALT_MODEL_PATH = { "models/wheatley.obj"/*"models/bricks/quad.obj"/*"models/scifi/cube.obj"/*, "models/rustedSphere2/sphere.obj","models/bricks/quad.obj"*/ };
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char*> validationLayers = {
@@ -171,14 +171,18 @@ private:
   VkRenderPass imGuiRenderPass;
   std::vector<VkFramebuffer> imGuiFramebuffers;
 
-  UniformBufferObject pushConstant;
-  std::vector<VkCommandBuffer> pushConstantCommandBuffers;
+  UniformBufferObject viewProj;
+  VkBuffer viewProjBuffer;
+  VkDeviceMemory viewProjMemory;
+  VkDescriptorSetLayout viewProjDescriptorLayout;
+  VkDescriptorSet viewProjDescriptor;
 
   bool cameraView = true;
 
   int currentModel = 0;
   int selectedModel = -1;
   int selectedMesh = 0;
+
 
 
   LightSource light;
@@ -244,7 +248,7 @@ private:
     createImageViews();
 
     createRenderPass();
-
+    setupViewProj();
     setupLights();
 
     createDescriptorSetLayouts();
@@ -264,7 +268,7 @@ private:
     createDepthResources();
     createFramebuffers();
 
-    setupPushConstant();
+
 
     createCommandBuffers();
     createSyncObjects();
@@ -430,6 +434,7 @@ private:
     init_info.ImageCount = static_cast<uint32_t>(swapChainImages.size());
     //init_info.CheckVkResultFn = check_vk_result;
     init_info.PipelineCache = device.pipelineCache;
+
     VkAttachmentDescription attachment = {};
     attachment.format = swapChainImageFormat;
     attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -513,9 +518,6 @@ private:
     vkFreeCommandBuffers(device.device, device.graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
     vkFreeCommandBuffers(device.device, device.resetCommandPool, static_cast<uint32_t>(imGuiCommandBuffers.size()), imGuiCommandBuffers.data());
-
-    vkFreeCommandBuffers(device.device, device.resetCommandPool, static_cast<uint32_t>(pushConstantCommandBuffers.size()), pushConstantCommandBuffers.data());
-
 
     vkDestroyRenderPass(device.device, renderPass, nullptr);
     
@@ -865,15 +867,16 @@ private:
     skybox.model = m;
 
     skybox.device = &device;
-    skybox.loadHdr("skybox/Newport_Loft_Ref.hdr", 1024);
+    //skybox.loadHdr("skybox/decor_shop_4k.hdr", 1024);
+    skybox.loadFromFiles("skybox/space");
 
     Pipeline p{};
     p.device = &device;
+    p.descriptorSetLayouts.push_back(viewProjDescriptorLayout);
     p.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
     p.descriptorSetLayouts.push_back(skybox.skyboxDescriptorSetLayout);
     p.swapChainExtent = swapChainExtent;
     p.renderPass = renderPass;
-    p.pushConstantSize = sizeof(UniformBufferObject);
     p.msaaSamples = msaaSamples;
     p.createGraphicsPipeline("compiledshaders/skybox.vert.spv", "compiledshaders/skybox.frag.spv");
     skybox.pipeline = p;
@@ -886,6 +889,62 @@ private:
   void createPBRMaps() {
     pbrMaps.device = &device;
     pbrMaps.generateMaps(&skybox);
+  }
+
+
+  void setupViewProj() {
+    viewProj.proj = Tools::projection(glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f));
+
+
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    device.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, viewProjBuffer, viewProjMemory);
+    void* data;
+    vkMapMemory(device.device, viewProjMemory, 0, bufferSize, 0, &data);
+    memcpy(data, &viewProj, bufferSize);
+    vkUnmapMemory(device.device, viewProjMemory);
+
+    VkDescriptorSetLayoutBinding layoutBinding{};
+    layoutBinding.binding = 0;
+    layoutBinding.descriptorCount = 1;
+    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding.pImmutableSamplers = nullptr;
+    layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(1);
+    layoutInfo.pBindings = &layoutBinding;
+
+    vkCreateDescriptorSetLayout(device.device, &layoutInfo, nullptr, &viewProjDescriptorLayout);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = device.descriptorPool;
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
+    allocInfo.pSetLayouts = &viewProjDescriptorLayout;
+
+    if (vkAllocateDescriptorSets(device.device, &allocInfo, &viewProjDescriptor) != VK_SUCCESS) {
+      throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = viewProjBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = bufferSize;
+
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = viewProjDescriptor;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = static_cast<uint32_t>(1);
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+
+    vkUpdateDescriptorSets(device.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
   }
 
   /**
@@ -1260,9 +1319,6 @@ private:
 
   }
 
-  void setupPushConstant() {
-    pushConstant.proj = Tools::projection(glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f));
-  }
 
   void createGraphicsPipelines() {
     //textured models
@@ -1271,16 +1327,14 @@ private:
       renderingPipeline.device = &device;
       renderingPipeline.swapChainExtent = swapChainExtent;
       renderingPipeline.renderPass = renderPass;
-      renderingPipeline.pushConstantSize = sizeof(UniformBufferObject);
       renderingPipeline.msaaSamples = msaaSamples;
+      renderingPipeline.descriptorSetLayouts.push_back(viewProjDescriptorLayout);
       renderingPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
-     
       renderingPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
       renderingPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
-      
-      //renderingPipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
       renderingPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
-      renderingPipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/shader.frag.spv");
+      //renderingPipeline.descriptorSetLayouts.push_back(shadowMap.descriptorLayout);
+      renderingPipeline.createGraphicsPipeline("compiledshaders/shader.tangent.vert.spv", "compiledshaders/basic.frag.spv");
     }
 
     //MATERIAL MODELS
@@ -1289,13 +1343,12 @@ private:
       pbrPipeline.device = &device;
       pbrPipeline.swapChainExtent = swapChainExtent;
       pbrPipeline.renderPass = renderPass;
-      pbrPipeline.pushConstantSize = sizeof(UniformBufferObject);
       pbrPipeline.msaaSamples = msaaSamples;
-      pbrPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
 
+      pbrPipeline.descriptorSetLayouts.push_back(viewProjDescriptorLayout);
+      pbrPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
       pbrPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
       pbrPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
-
       pbrPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
       pbrPipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
 
@@ -1306,13 +1359,12 @@ private:
       pbrAltPipeline.device = &device;
       pbrAltPipeline.swapChainExtent = swapChainExtent;
       pbrAltPipeline.renderPass = renderPass;
-      pbrAltPipeline.pushConstantSize = sizeof(UniformBufferObject);
       pbrAltPipeline.msaaSamples = msaaSamples;
-      pbrAltPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
 
+      pbrAltPipeline.descriptorSetLayouts.push_back(viewProjDescriptorLayout);
+      pbrAltPipeline.descriptorSetLayouts.push_back(lightDescriptorLayout);
       pbrAltPipeline.descriptorSetLayouts.push_back(modelDescriptorSetLayout);
       pbrAltPipeline.descriptorSetLayouts.push_back(materialDescriptorSetLayout);
-
       pbrAltPipeline.descriptorSetLayouts.push_back(shadowCubeMap.shadowDescriptorSetLayout);
       pbrAltPipeline.descriptorSetLayouts.push_back(pbrMaps.descriptorSetLayout);
       pbrAltPipeline.descriptorSetLayouts.push_back(brdfTexture.descriptorSetLayout);
@@ -1495,18 +1547,6 @@ private:
   }
 
   void createCommandBuffers() {
-    {
-      pushConstantCommandBuffers.resize(swapChainFramebuffers.size());
-      VkCommandBufferAllocateInfo allocInfo{};
-      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-      allocInfo.commandPool = device.resetCommandPool;
-      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      allocInfo.commandBufferCount = (uint32_t)pushConstantCommandBuffers.size();
-
-      if (vkAllocateCommandBuffers(device.device, &allocInfo, pushConstantCommandBuffers.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate command buffers!");
-      }
-    }
 
     {
       imGuiCommandBuffers.resize(swapChainFramebuffers.size());
@@ -1562,9 +1602,8 @@ private:
         renderPassInfo.pClearValues = clearValues.data();
 
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
         //Non-pbr models
-        std::vector<VkDescriptorSet*> descriptors = {&lightDescriptor,&shadowCubeMap.shadowDescriptorSet[i]};
+        std::vector<VkDescriptorSet*> descriptors = {&viewProjDescriptor, &lightDescriptor,&shadowCubeMap.shadowDescriptorSet[i]};
         if(renderingPipeline.valid())
         {
           renderingPipeline.draw(commandBuffers[i], descriptors, i);
@@ -1580,7 +1619,7 @@ private:
           pbrAltPipeline.draw(commandBuffers[i], descriptors, i);
         }
 
-        skybox.draw(commandBuffers[i]);
+        skybox.draw(commandBuffers[i], viewProjDescriptor);
 
         vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -1631,8 +1670,8 @@ private:
     if(cameraView){
       //Seperate camera
       camera.updateCam(deltaFrame, currentX, currentY);
-      pushConstant.view = camera.getViewMat();
-      pushConstant.camPos = camera.cameraPos;
+      viewProj.view = camera.getViewMat();
+      viewProj.camPos = camera.cameraPos;
     }
     else {
       //Camera attached to object
@@ -1644,28 +1683,35 @@ private:
           models[selectedModel]->modelPos = glm::translate(models[selectedModel]->modelPos, glm::vec3(0.0f, 0.0f, 2.0f * 5.0f * deltaFrame));
         objectMoved = true;
       }
-      pushConstant.camPos = models[selectedModel]->modelPos * glm::vec4(camera.updateObjectCam(currentX, currentY),1.0f);
+      viewProj.camPos = models[selectedModel]->modelPos * glm::vec4(camera.updateObjectCam(currentX, currentY),1.0f);
       glm::vec4 front(0.0f, 0.0f, 0.1f, 1.0f);
       front = models[selectedModel]->modelPos * front;
-      pushConstant.view = glm::lookAt(pushConstant.camPos, glm::vec3(front),glm::vec3(0.0f,1.0f,0.0f));
+      viewProj.view = glm::lookAt(viewProj.camPos, glm::vec3(front),glm::vec3(0.0f,1.0f,0.0f));
     }
-
+    //Update view,projection and camera data
+    {
+      void* data;
+      vkMapMemory(device.device, viewProjMemory, 0, sizeof(UniformBufferObject), 0, &data);
+      memcpy(data, &viewProj, sizeof(UniformBufferObject));
+      vkUnmapMemory(device.device, viewProjMemory);
+    }
     //if object has moved, update descriptors
     if (objectMoved) {
       models[selectedModel]->updateDescriptors();
     }
 
     //update the positional information for skybox
-    skybox.model.modelPos = pushConstant.view;
+    skybox.model.modelPos = viewProj.view;
     skybox.model.modelPos[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     skybox.model.updateDescriptors();
 
-    //simple update for single light source...
-    void* data;
-    vkMapMemory(device.device, lightMemory, 0, sizeof(LightSource), 0, &data);
-    memcpy(data, &light, sizeof(LightSource));
-    vkUnmapMemory(device.device, lightMemory);
-
+    {
+      //simple update for single light source...
+      void* data;
+      vkMapMemory(device.device, lightMemory, 0, sizeof(LightSource), 0, &data);
+      memcpy(data, &light, sizeof(LightSource));
+      vkUnmapMemory(device.device, lightMemory);
+    }
     //Update shadowmap descriptors with potential new light position
     shadowCubeMap.updateRenderDescriptorSets();
 
@@ -1691,19 +1737,6 @@ private:
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
     updatePositions();
-    //send the camera info as pushconstant
-    {
-      VkCommandBufferBeginInfo info = {};
-      info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-      info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-      if (vkBeginCommandBuffer(pushConstantCommandBuffers[imageIndex], &info) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create psuch constant command buffer!");
-      }
-    }
-    vkCmdPushConstants(pushConstantCommandBuffers[imageIndex], renderingPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformBufferObject), (void*)&pushConstant);
-    if (vkEndCommandBuffer(pushConstantCommandBuffers[imageIndex]) != VK_SUCCESS) {
-      throw std::runtime_error("failed to end imgui command buffer!");
-    }
 
     //IMGUI start
     {
@@ -1800,8 +1833,12 @@ private:
 
       }
       ImGui::Render();
+      ImDrawData* draw_data = ImGui::GetDrawData();
 
       {
+        if (vkResetCommandBuffer(imGuiCommandBuffers[imageIndex], 0) != VK_SUCCESS) {
+          throw std::runtime_error("failed to create imgui command buffer!");
+        }
         VkCommandBufferBeginInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -1821,7 +1858,7 @@ private:
         vkCmdBeginRenderPass(imGuiCommandBuffers[imageIndex], &info, VK_SUBPASS_CONTENTS_INLINE);
       }
 
-      ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), imGuiCommandBuffers[imageIndex]);
+      ImGui_ImplVulkan_RenderDrawData(draw_data, imGuiCommandBuffers[imageIndex]);
 
       vkCmdEndRenderPass(imGuiCommandBuffers[imageIndex]);
       if (vkEndCommandBuffer(imGuiCommandBuffers[imageIndex]) != VK_SUCCESS) {
@@ -1830,8 +1867,8 @@ private:
     }
     //IMGUI END
 
-    std::array<VkCommandBuffer, 3> submitCommandBuffers =
-    { pushConstantCommandBuffers[imageIndex], commandBuffers[imageIndex], imGuiCommandBuffers[imageIndex] };
+    std::array<VkCommandBuffer, 2> submitCommandBuffers =
+    { commandBuffers[imageIndex], imGuiCommandBuffers[imageIndex] };
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1890,15 +1927,15 @@ private:
       }
     }
 
-    //return availableFormats[0];
+    return availableFormats[0];
   }
 
   VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-    for (const auto& availablePresentMode : availablePresentModes) {
-      if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-        return availablePresentMode;
-      }
-    }
+    //for (const auto& availablePresentMode : availablePresentModes) {
+    //  if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+    //    return availablePresentMode;
+    //  }
+    //}
 
     return VK_PRESENT_MODE_FIFO_KHR;
   }
@@ -1988,6 +2025,7 @@ private:
     std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
     for (const auto& extension : availableExtensions) {
+      //std::cout << extension.extensionName << std::endl;
       requiredExtensions.erase(extension.extensionName);
     }
 
@@ -2044,7 +2082,7 @@ private:
     if (enableValidationLayers) {
       extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-
+    extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     return extensions;
   }
 

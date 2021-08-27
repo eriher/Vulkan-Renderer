@@ -293,10 +293,10 @@ void Model::draw(VkCommandBuffer &cb, VkPipelineLayout &pipelineLayout, int i)
 
 	vkCmdBindIndexBuffer(cb, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &descriptorSets[i], 0, nullptr);
+	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1, &descriptorSets[i], 0, nullptr);
 
 	for (auto& mesh : meshes) {
-		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1, &materials[mesh.material].descriptorSets[i], 0, nullptr);
+		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 3, 1, &materials[mesh.material].descriptorSets[i], 0, nullptr);
 		vkCmdDrawIndexed(cb, mesh.indices, 1, mesh.start_index, 0, 0);
 	}
 }

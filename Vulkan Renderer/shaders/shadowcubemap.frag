@@ -8,8 +8,6 @@ layout (location = 1) in vec3 inLightPos;
 
 void main() 
 {
-	// Store distance to light as 32 bit float value
     vec3 lightVec = inPos - inLightPos;
-    //outFragColor = min(length(lightVec),100.0f);
     outFragColor = length(lightVec);
 }

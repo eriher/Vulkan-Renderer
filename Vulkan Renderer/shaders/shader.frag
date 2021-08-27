@@ -3,13 +3,13 @@
 #define EPSILON 0.015
 #define SHADOW_OPACITY 0.5
 
-layout(set=0, binding = 0) uniform Light { 
+layout(set=1, binding = 0) uniform Light { 
 	vec4 position;
 	vec4 color;
 	float intensity;
 } light;
 
-layout(set=2, binding = 0) uniform Material {
+layout(set=3, binding = 0) uniform Material {
 	vec4	color;
 	float		reflectivity;
 	float		shininess;
@@ -19,13 +19,16 @@ layout(set=2, binding = 0) uniform Material {
 	float		transparency;
 } m;
 
-layout(set=2, binding = 1) uniform sampler2D colorMap;
-layout(set=2, binding = 4) uniform sampler2D normalMap;
-layout(set = 2, binding = 6) uniform sampler2D emissionMap;
-layout(set = 2, binding = 7) uniform sampler2D depthMap;
+layout(set = 3, binding = 1) uniform sampler2D colorMap;
+layout(set = 3, binding = 2) uniform sampler2D metalMap;
+layout(set = 3, binding = 3) uniform sampler2D roughnessMap;
+layout(set = 3, binding = 4) uniform sampler2D normalMap;
+layout(set = 3, binding = 5) uniform sampler2D aoMap;
+layout(set = 3, binding = 6) uniform sampler2D emissionMap;
+layout(set = 3, binding = 7) uniform sampler2D depthMap;
 
 //layout(set=3, binding = 1) uniform sampler2D shadowMap;
-layout(set=3, binding = 0) uniform samplerCube shadowCubeMap;
+layout(set=4, binding = 0) uniform samplerCube shadowCubeMap;
 
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 tangentLightPos;

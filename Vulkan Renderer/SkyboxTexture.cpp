@@ -12,7 +12,7 @@ void SkyboxTexture::cleanup() {
   pipeline.cleanup();
 }
 
-void SkyboxTexture::draw(VkCommandBuffer& cb)
+void SkyboxTexture::draw(VkCommandBuffer& cb, VkDescriptorSet& descriptor)
 {
   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
@@ -22,8 +22,9 @@ void SkyboxTexture::draw(VkCommandBuffer& cb)
 
   vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &model.descriptorSets[0], 0, nullptr);
-  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 1, 1, &skyboxDescriptorSet, 0, nullptr);
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &descriptor, 0, nullptr);
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 1, 1, &model.descriptorSets[0], 0, nullptr);
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 2, 1, &skyboxDescriptorSet, 0, nullptr);
 
   vkCmdDrawIndexed(cb, model.indices, 1, 0, 0, 0);
 }
@@ -34,7 +35,7 @@ void SkyboxTexture::loadFromFiles(const std::string directory) {
   std::vector<VkDeviceMemory> buffersMemory;
   for (int i = 0; i < 6; i++) {
     //int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load((directory + "/" + directions[i] + ".jpg").c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load((directory + "/" + directions[i] + ".png").c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     //std::cout << texChannels << std::endl;
     //std::cout << texWidth << std::endl;
     //std::cout << texHeight << std::endl;
@@ -76,7 +77,7 @@ void SkyboxTexture::loadFromFiles(const std::string directory) {
   transitionImageLayout(skyboxImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
   createImageView(skyboxImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, 1, &skyboxView);
   createTextureSampler();
-
+  createSkyboxDescriptors();
 }
 
 void SkyboxTexture::loadHdr(const std::string& filename, int dim)

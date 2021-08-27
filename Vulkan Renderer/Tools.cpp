@@ -15,7 +15,6 @@ void Tools::createImage(Device* device, VkImage& image, VkDeviceMemory& memory, 
   imageInfo.usage = usage;
   imageInfo.samples = samples;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  imageInfo.flags = VK_NULL_HANDLE;
 
   if (vkCreateImage(device->device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
     throw std::runtime_error("failed to create image!");

@@ -14,7 +14,7 @@ class ShadowCubeMap
 		glm::vec4 lightPos;
 	};
 	VkDeviceSize bufferSize = sizeof(OffscreenUbo);
-	uint32_t dim = 4*1024;
+	uint32_t dim = 2*1024;
 	//VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 	VkFormat colorFormat = VK_FORMAT_R32_SFLOAT;
 	//VkFormat colorFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
