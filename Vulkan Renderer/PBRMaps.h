@@ -11,7 +11,8 @@ class PBRMaps
 		glm::mat4 proj;
 		glm::mat4 views[6];
 	};
-	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	//VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	VkFormat imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
 	int irradianceDim = 64;
 	int reflectDim = 256;
 	void createImage(VkImage& image, uint32_t width, uint32_t height, uint32_t mipLevels, VkDeviceMemory& memory);

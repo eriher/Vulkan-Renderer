@@ -55,6 +55,7 @@ void Model::cleanup() {
 
 	//vkDestroyDescriptorSetLayout(device->device, descriptorSetLayout, nullptr);
 };
+
 void Model::loadModel(std::string modelPath) {
 	name = modelPath.substr(modelPath.find_last_of('/')+1, modelPath.find_first_of('.') - (modelPath.find_last_of('/')+1));
 	tinyobj::attrib_t attrib;

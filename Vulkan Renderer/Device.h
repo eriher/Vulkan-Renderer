@@ -1,13 +1,14 @@
 #pragma once
-#define GLM_ENABLE_EXPERIMENTAL
+
 //#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "vulkan/vulkan.h"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+#include <glm/glm.hpp>
 #include <optional>
 #include <stdexcept>
 #include <vector>
 #include <set>
-#include <glm/gtx/hash.hpp>
-#include <glm/glm.hpp>
 #include <array>
 
 struct EmptyImage{

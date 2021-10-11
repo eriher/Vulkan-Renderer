@@ -1,6 +1,6 @@
-#include "ShadowCubeMap.h"
+#include "ShadowCubeMap2.h"
 
-void ShadowCubeMap::setupShadowMap(glm::vec4 *lightPos, std::vector<std::shared_ptr<Model>> &m, int frameCount) {
+void ShadowCubeMap2::setupShadowMap(glm::vec4 *lightPos, std::vector<std::shared_ptr<Model>> &m, int frameCount) {
   this->lightPos = lightPos;
   models = m;
 	//create the color and depth images
@@ -154,7 +154,7 @@ void ShadowCubeMap::setupShadowMap(glm::vec4 *lightPos, std::vector<std::shared_
   }
 }
 
-void ShadowCubeMap::cleanup()
+void ShadowCubeMap2::cleanup()
 {
 
   vkDestroyPipeline(device->device, pipeline, nullptr);
@@ -186,7 +186,7 @@ void ShadowCubeMap::cleanup()
 
 }
 
-void ShadowCubeMap::draw(VkCommandBuffer &commands, int idx) {
+void ShadowCubeMap2::draw(VkCommandBuffer &commands, int idx) {
   std::array<VkClearValue, 2> clearValues{};
   clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
   clearValues[1].depthStencil = { 1.0f, 0 };
@@ -225,7 +225,7 @@ void ShadowCubeMap::draw(VkCommandBuffer &commands, int idx) {
 
 }
 
-void ShadowCubeMap::createRenderPass(VkRenderPass* renderPass) {
+void ShadowCubeMap2::createRenderPass(VkRenderPass* renderPass) {
 
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = colorFormat;
@@ -324,7 +324,7 @@ void ShadowCubeMap::createRenderPass(VkRenderPass* renderPass) {
     }
 }
 
-void ShadowCubeMap::createFramebuffer(int i, VkRenderPass &renderPass) {
+void ShadowCubeMap2::createFramebuffer(int i, VkRenderPass &renderPass) {
 
   std::array<VkImageView, 2> attachments = {
     colorView[i],
@@ -350,11 +350,11 @@ void ShadowCubeMap::createFramebuffer(int i, VkRenderPass &renderPass) {
   
 }
 
-void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkPipeline* pipeline, VkRenderPass &renderPass, std::vector< VkDescriptorSetLayout> & descriptorSetLayouts) {
+void ShadowCubeMap2::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkPipeline* pipeline, VkRenderPass &renderPass, std::vector< VkDescriptorSetLayout> & descriptorSetLayouts) {
   {
     
-    auto vertShaderCode = Tools::readFile("compiledshaders/shadowcubemap.vert.spv");
-    auto fragShaderCode = Tools::readFile("compiledshaders/shadowcubemap.frag.spv");
+    auto vertShaderCode = Tools::readFile("compiledshaders/ShadowCubeMap2.vert.spv");
+    auto fragShaderCode = Tools::readFile("compiledshaders/ShadowCubeMap2.frag.spv");
 
     VkShaderModule vertShaderModule = Tools::createShaderModule(device->device, vertShaderCode);
     VkShaderModule fragShaderModule = Tools::createShaderModule(device->device, fragShaderCode);
@@ -487,7 +487,7 @@ void ShadowCubeMap::createGraphicsPipeline(VkPipelineLayout* pipelineLayout, VkP
   }
 }
 
-void ShadowCubeMap::createImage(VkImage& image, VkDeviceMemory& memory, VkFormat format, VkImageUsageFlags flags) {
+void ShadowCubeMap2::createImage(VkImage& image, VkDeviceMemory& memory, VkFormat format, VkImageUsageFlags flags) {
   VkImageCreateInfo imageInfo{};
   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -524,7 +524,7 @@ void ShadowCubeMap::createImage(VkImage& image, VkDeviceMemory& memory, VkFormat
   vkBindImageMemory(device->device, image, memory, 0);
 }
 
-void ShadowCubeMap::createView(VkImage &image, VkImageView &view, VkFormat format, VkComponentSwizzle swizzle, VkImageAspectFlags aspectFlag) {
+void ShadowCubeMap2::createView(VkImage &image, VkImageView &view, VkFormat format, VkComponentSwizzle swizzle, VkImageAspectFlags aspectFlag) {
   VkImageViewCreateInfo viewInfo{};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = image;
@@ -545,7 +545,7 @@ void ShadowCubeMap::createView(VkImage &image, VkImageView &view, VkFormat forma
   }
 }
 
-void ShadowCubeMap::updateRenderDescriptorSets() {
+void ShadowCubeMap2::updateRenderDescriptorSets() {
   glm::vec3 eye = *lightPos;
   float near_plane = 0.1f;
   float far_plane = 1024.0f;

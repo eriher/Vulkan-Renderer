@@ -275,9 +275,9 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim)
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     //rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    //rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizer.cullMode = VK_CULL_MODE_NONE;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    //rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -352,15 +352,6 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim)
      glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f))
     } };
 
-/*
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f,  0.0f),   glm::vec3(0.0f, -1.0f, 0.0f)),
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  -1.0f,  0.0f),  glm::vec3(0.0f, 0.0f, -1.0f)),
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f),  glm::vec3(0.0f, 0.0f, 1.0f)),
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f),  glm::vec3(0.0f, -1.0f, 0.0f)),
-     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f),  glm::vec3(0.0f, -1.0f, 0.0f))
-*/
-
   VkBuffer buffer;
   VkDeviceMemory memory;
 
@@ -420,7 +411,7 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim)
     auto commands = device->beginSingleTimeCommands(device->transientCommandPool);
 
     VkClearValue clearValues[1];
-    clearValues[0].color = { 0.0f, 0.5f, 0.0f, 1.0f };
+    clearValues[0].color = { 1.0f, 0.0f, 0.0f, 1.0f };
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -462,6 +453,7 @@ void SkyboxTexture::loadHdr(const std::string& filename, int dim)
     vkDeviceWaitIdle(device->device);
     vkFreeCommandBuffers(device->device, device->transientCommandPool, 1, &commands);
   }
+
   createSkyboxDescriptors();
   //texture has now been rendered
   //cleanup
@@ -490,7 +482,7 @@ void SkyboxTexture::createImage(VkImage &image, uint32_t width, uint32_t height,
   imageInfo.format = imageFormat;
   imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -596,7 +588,7 @@ void SkyboxTexture::transitionImageLayout(VkImage image, VkFormat format, VkImag
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = mipLevels;
   barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.layerCount = 6;
 
   VkPipelineStageFlags sourceStage;
   VkPipelineStageFlags destinationStage;

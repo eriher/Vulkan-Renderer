@@ -209,7 +209,7 @@ void main() {
 
 	vec3 color = emission_term +  direct_illumination_term + indirect_illumination;
 
-  	float exposure = 3.0f;
+  float exposure = 3.0f;
 	color = vec3(1.0) - exp(-color * exposure);
 	outColor = vec4(color,1.0);
 

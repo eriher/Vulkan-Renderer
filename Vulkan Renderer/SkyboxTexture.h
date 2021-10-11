@@ -1,11 +1,10 @@
 #pragma once
-#include "vulkan/vulkan.h"
-#include "stb_image.h"
-#include "Device.h"
+
 #include <iostream>
+
+#include "common.h"
+#include "stb_image.h"
 #include "HdrTexture.h"
-#include "Tools.h"
-#include "Model.h"
 #include "Pipeline.h"
 class SkyboxTexture
 {
@@ -14,13 +13,9 @@ class SkyboxTexture
 		glm::mat4 views[6];
 	};
 
-	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
-	//VkFormat imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
-	//VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
-	//VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-	//VkFormat imageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-	int irradianceDim = 64;
-	int reflectDim = 256;
+
+	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+
 	public:
 		Device*								device;
 

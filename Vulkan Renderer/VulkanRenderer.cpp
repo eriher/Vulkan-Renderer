@@ -5,7 +5,6 @@
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
 //#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
@@ -33,7 +32,6 @@
 #include "Model.h"
 #include "Pipeline.h"
 #include "SkyboxTexture.h"
-#include "HdrTexture.h"
 #include "ShadowMap.h"
 #include "ShadowCubeMap.h"
 #include "RenderToTexture.h"
@@ -867,7 +865,7 @@ private:
     skybox.model = m;
 
     skybox.device = &device;
-    //skybox.loadHdr("skybox/decor_shop_4k.hdr", 1024);
+    //skybox.loadHdr("skybox/001.hdr", 1024);
     skybox.loadFromFiles("skybox/space");
 
     Pipeline p{};
@@ -1017,7 +1015,7 @@ private:
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
-    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
     //imageInfo.tiling = tiling;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -1072,7 +1070,7 @@ private:
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = device.emptyImage.image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    viewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
     viewInfo.subresourceRange.aspectMask = 1;
     //viewInfo.subresourceRange.baseMipLevel = 0;
     //viewInfo.subresourceRange.baseArrayLayer = 0;

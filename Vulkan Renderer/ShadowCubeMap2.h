@@ -4,7 +4,7 @@
 #include "Model.h"
 #include "Tools.h"
 
-class ShadowCubeMap
+class ShadowCubeMap2
 {
 	glm::vec4* lightPos;
 	std::vector<std::shared_ptr<Model>> models;
@@ -15,9 +15,10 @@ class ShadowCubeMap
 	};
 	VkDeviceSize bufferSize = sizeof(OffscreenUbo);
 	uint32_t dim = 2*1024;
-
-	VkFormat colorFormat = VK_FORMAT_R32_SFLOAT;
-
+	//VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	//VkFormat colorFormat = VK_FORMAT_R32_SFLOAT;
+	VkFormat colorFormat = VK_FORMAT_D16_UNORM;
+	//VkFormat colorFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
 	float depthBiasConstant = 1.25f;
 	float depthBiasSlope = 1.75f;
 	void createImage(VkImage&, VkDeviceMemory&, VkFormat, VkImageUsageFlags);
